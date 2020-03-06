@@ -1,0 +1,15 @@
+{
+  "TimeFormat":"2006-01-02 15:04:05",
+  "Console": {
+    "level": "DEBG",
+    "color": true
+  },
+  "File": {
+    "filename": "app.log",
+    "level": "DEBG",
+    "daily": true,
+    "maxdays": -1,
+    "append": true,
+    "permit": "0660"
+  }
+}
