@@ -9,9 +9,9 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/sea-project/wagon/wasm"
-	"github.com/sea-project/wagon/wasm/leb128"
-	ops "github.com/sea-project/wagon/wasm/operators"
+	"github.com/sea-project/sea-pkg/wagon/wasm"
+	"github.com/sea-project/sea-pkg/wagon/wasm/leb128"
+	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
 )
 
 // mockVM is a minimal implementation of a virtual machine to

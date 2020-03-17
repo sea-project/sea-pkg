@@ -5,7 +5,7 @@
 package exec
 
 import (
-	ops "github.com/sea-project/wagon/wasm/operators"
+	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
 )
 
 func (vm *VM) newFuncTable() {

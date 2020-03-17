@@ -42,9 +42,9 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/sea-project/wagon/disasm"
-	ops "github.com/sea-project/wagon/wasm/operators"
-	"github.com/sea-project/wagon/vnt"
+	"github.com/sea-project/sea-pkg/wagon/disasm"
+	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
+	"github.com/sea-project/sea-pkg/wagon/vnt"
 )
 
 // A small note on the usage of discard instructions:

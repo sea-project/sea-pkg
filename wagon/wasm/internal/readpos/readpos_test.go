@@ -9,7 +9,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/sea-project/wagon/wasm/internal/readpos"
+	"github.com/sea-project/sea-pkg/wagon/wasm/internal/readpos"
 )
 
 func TestRead(t *testing.T) {

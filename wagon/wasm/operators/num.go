@@ -5,7 +5,7 @@
 package operators
 
 import (
-	"github.com/sea-project/wagon/wasm"
+	"github.com/sea-project/sea-pkg/wagon/wasm"
 )
 
 var (

@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sea-project/wagon/wasm"
-	ops "github.com/sea-project/wagon/wasm/operators"
+	"github.com/sea-project/sea-pkg/wagon/wasm"
+	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
 )
 
 type Error struct {

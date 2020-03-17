@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/sea-project/wagon/wasm"
+	"github.com/sea-project/sea-pkg/wagon/wasm"
 )
 
 func TestHostCall(t *testing.T) {

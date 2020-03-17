@@ -9,7 +9,7 @@ import (
 	"math"
 	"reflect"
 
-	"github.com/sea-project/wagon/vnt"
+	"github.com/sea-project/sea-pkg/wagon/vnt"
 )
 
 type function interface {

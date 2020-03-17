@@ -14,9 +14,9 @@ import (
 	"os"
 	"sort"
 
-	"github.com/sea-project/wagon/disasm"
-	"github.com/sea-project/wagon/wasm"
-	"github.com/sea-project/wagon/wasm/leb128"
+	"github.com/sea-project/sea-pkg/wagon/disasm"
+	"github.com/sea-project/sea-pkg/wagon/wasm"
+	"github.com/sea-project/sea-pkg/wagon/wasm/leb128"
 )
 
 // TODO: track the number of imported funcs,memories,tables and globals to adjust

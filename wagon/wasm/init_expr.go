@@ -11,7 +11,7 @@ import (
 	"io"
 	"math"
 
-	"github.com/sea-project/wagon/wasm/leb128"
+	"github.com/sea-project/sea-pkg/wagon/wasm/leb128"
 )
 
 const (

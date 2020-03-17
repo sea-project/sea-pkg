@@ -12,11 +12,11 @@ import (
 	"io"
 	"math"
 
-	"github.com/sea-project/wagon/disasm"
-	"github.com/sea-project/wagon/exec/internal/compile"
-	"github.com/sea-project/wagon/vnt"
-	"github.com/sea-project/wagon/wasm"
-	ops "github.com/sea-project/wagon/wasm/operators"
+	"github.com/sea-project/sea-pkg/wagon/disasm"
+	"github.com/sea-project/sea-pkg/wagon/exec/internal/compile"
+	"github.com/sea-project/sea-pkg/wagon/vnt"
+	"github.com/sea-project/sea-pkg/wagon/wasm"
+	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
 )
 
 var (

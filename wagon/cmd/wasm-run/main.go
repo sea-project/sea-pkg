@@ -11,9 +11,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/sea-project/wagon/exec"
-	"github.com/sea-project/wagon/validate"
-	"github.com/sea-project/wagon/wasm"
+	"github.com/sea-project/sea-pkg/wagon/exec"
+	"github.com/sea-project/sea-pkg/wagon/validate"
+	"github.com/sea-project/sea-pkg/wagon/wasm"
 )
 
 func main() {

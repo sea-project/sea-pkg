@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/sea-project/wagon/wasm"
+	"github.com/sea-project/sea-pkg/wagon/wasm"
 )
 
 func TestEncode(t *testing.T) {

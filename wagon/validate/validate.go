@@ -9,8 +9,8 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/sea-project/wagon/wasm"
-	ops "github.com/sea-project/wagon/wasm/operators"
+	"github.com/sea-project/sea-pkg/wagon/wasm"
+	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
 )
 
 // vibhavp: TODO: We do not verify whether blocks don't access for the parent block, do that.

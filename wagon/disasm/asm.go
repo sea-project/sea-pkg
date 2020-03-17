@@ -9,8 +9,8 @@ import (
 	"encoding/binary"
 	"math"
 
-	"github.com/sea-project/wagon/wasm/leb128"
-	ops "github.com/sea-project/wagon/wasm/operators"
+	"github.com/sea-project/sea-pkg/wagon/wasm/leb128"
+	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
 )
 
 // Assemble encodes a set of instructions into binary representation.

@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/sea-project/wagon/disasm"
-	"github.com/sea-project/wagon/wasm"
+	"github.com/sea-project/sea-pkg/wagon/disasm"
+	"github.com/sea-project/sea-pkg/wagon/wasm"
 )
 
 var testPaths = []string{

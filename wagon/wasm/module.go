@@ -9,7 +9,7 @@ import (
 	"io"
 	"reflect"
 
-	"github.com/sea-project/wagon/wasm/internal/readpos"
+	"github.com/sea-project/sea-pkg/wagon/wasm/internal/readpos"
 )
 
 var ErrInvalidMagic = errors.New("wasm: Invalid magic number")

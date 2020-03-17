@@ -11,8 +11,8 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/sea-project/wagon/exec"
-	"github.com/sea-project/wagon/wasm"
+	"github.com/sea-project/sea-pkg/wagon/exec"
+	"github.com/sea-project/sea-pkg/wagon/wasm"
 )
 
 func ExampleVM_add() {
@@ -118,7 +118,7 @@ func ExampleVM_add() {
 // compileWast2Wasm fakes a compilation pass from WAST to WASM.
 //
 // When wagon gets a WAST parser, this function will be running an actual compilation.
-// See: https://github.com/sea-project/wagon/issues/34
+// See: https://github.com/sea-project/sea-pkg/wagon/issues/34
 func compileWast2Wasm(fname string) ([]byte, error) {
 	switch fname {
 	case "testdata/add-ex.wast":

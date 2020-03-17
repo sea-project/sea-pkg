@@ -12,10 +12,10 @@ import (
 	"io"
 	"math"
 
-	"github.com/sea-project/wagon/internal/stack"
-	"github.com/sea-project/wagon/wasm"
-	"github.com/sea-project/wagon/wasm/leb128"
-	ops "github.com/sea-project/wagon/wasm/operators"
+	"github.com/sea-project/sea-pkg/wagon/internal/stack"
+	"github.com/sea-project/sea-pkg/wagon/wasm"
+	"github.com/sea-project/sea-pkg/wagon/wasm/leb128"
+	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
 )
 
 // Instr describes an instruction, consisting of an operator, with its
