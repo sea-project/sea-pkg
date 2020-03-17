@@ -1,11 +1,14 @@
+// Copyright 2017 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package wasm
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
-	"github.com/sea-project/sea-pkg/wagon/wasm/leb128"
+	"github.com/sea-project/wagon/wasm/leb128"
 )
 
 type Marshaler interface {
@@ -19,13 +22,13 @@ type Unmarshaler interface {
 }
 
 // ValueType represents the type of a valid value in Wasm
-type ValueType uint8
+type ValueType int8
 
 const (
-	ValueTypeI32 ValueType = 0x7f
-	ValueTypeI64 ValueType = 0x7e
-	ValueTypeF32 ValueType = 0x7d
-	ValueTypeF64 ValueType = 0x7c
+	ValueTypeI32 ValueType = -0x01
+	ValueTypeI64 ValueType = -0x02
+	ValueTypeF32 ValueType = -0x03
+	ValueTypeF64 ValueType = -0x04
 )
 
 var valueTypeStrMap = map[ValueType]string{
@@ -44,10 +47,10 @@ func (t ValueType) String() string {
 }
 
 // TypeFunc represents the value type of a function
-const TypeFunc uint8 = 0x60
+const TypeFunc int = -0x20
 
 func (t *ValueType) UnmarshalWASM(r io.Reader) error {
-	v, err := ReadByte(r)
+	v, err := leb128.ReadVarint32(r)
 	if err != nil {
 		return err
 	}
@@ -56,13 +59,13 @@ func (t *ValueType) UnmarshalWASM(r io.Reader) error {
 }
 
 func (t ValueType) MarshalWASM(w io.Writer) error {
-	err := writeByte(w, byte(t))
+	_, err := leb128.WriteVarint64(w, int64(t))
 	return err
 }
 
 // BlockType represents the signature of a structured block
 type BlockType ValueType // varint7
-const BlockTypeEmpty BlockType = 0x40
+const BlockTypeEmpty BlockType = -0x40
 
 func (b BlockType) String() string {
 	if b == BlockTypeEmpty {
@@ -72,24 +75,22 @@ func (b BlockType) String() string {
 }
 
 // ElemType describes the type of a table's elements
-type ElemType uint8 // varint7
+type ElemType int // varint7
 // ElemTypeAnyFunc descibres an any_func value
-const ElemTypeAnyFunc ElemType = 0x70
+const ElemTypeAnyFunc ElemType = -0x10
 
 func (t *ElemType) UnmarshalWASM(r io.Reader) error {
-	b, err := ReadByte(r)
+	b, err := leb128.ReadVarint32(r)
 	if err != nil {
 		return err
-	}
-	if b != uint8(ElemTypeAnyFunc) {
-		return fmt.Errorf("wasm: unsupported elem type:%d", b)
 	}
 	*t = ElemType(b)
 	return nil
 }
 
 func (t ElemType) MarshalWASM(w io.Writer) error {
-	return writeByte(w, byte(t))
+	_, err := leb128.WriteVarint64(w, int64(t))
+	return err
 }
 
 func (t ElemType) String() string {
@@ -103,7 +104,7 @@ func (t ElemType) String() string {
 // FunctionSig describes the signature of a declared function in a WASM module
 type FunctionSig struct {
 	// value for the 'func` type constructor
-	Form uint8 // must be 0x60
+	Form int8
 	// The parameter types of the function
 	ParamTypes  []ValueType
 	ReturnTypes []ValueType
@@ -123,27 +124,23 @@ func (e InvalidTypeConstructorError) Error() string {
 }
 
 func (f *FunctionSig) UnmarshalWASM(r io.Reader) error {
-	form, err := ReadByte(r)
+	form, err := leb128.ReadVarint32(r)
 	if err != nil {
 		return err
 	}
-	if form != TypeFunc {
-		return fmt.Errorf("wasm: unknown function form: %x", form)
-	}
-	f.Form = uint8(form)
+	f.Form = int8(form)
 
 	paramCount, err := leb128.ReadVarUint32(r)
 	if err != nil {
 		return err
 	}
-	f.ParamTypes = make([]ValueType, 0, getInitialCap(paramCount))
+	f.ParamTypes = make([]ValueType, paramCount)
 
-	for i := uint32(0); i < paramCount; i++ {
-		var v ValueType
-		if err = v.UnmarshalWASM(r); err != nil {
+	for i := range f.ParamTypes {
+		err = f.ParamTypes[i].UnmarshalWASM(r)
+		if err != nil {
 			return err
 		}
-		f.ParamTypes = append(f.ParamTypes, v)
 	}
 
 	returnCount, err := leb128.ReadVarUint32(r)
@@ -151,20 +148,19 @@ func (f *FunctionSig) UnmarshalWASM(r io.Reader) error {
 		return err
 	}
 
-	f.ReturnTypes = make([]ValueType, 0, getInitialCap(returnCount))
-	for i := uint32(0); i < returnCount; i++ {
-		var v ValueType
-		if err = v.UnmarshalWASM(r); err != nil {
+	f.ReturnTypes = make([]ValueType, returnCount)
+	for i := range f.ReturnTypes {
+		err = f.ReturnTypes[i].UnmarshalWASM(r)
+		if err != nil {
 			return err
 		}
-		f.ReturnTypes = append(f.ReturnTypes, v)
 	}
 
 	return nil
 }
 
 func (f *FunctionSig) MarshalWASM(w io.Writer) error {
-	err := writeByte(w, f.Form)
+	_, err := leb128.WriteVarint64(w, int64(f.Form))
 	if err != nil {
 		return err
 	}
@@ -199,10 +195,6 @@ type GlobalVar struct {
 	Mutable bool      // Whether the value of the variable can be changed by the set_global operator
 }
 
-func (g *GlobalVar) String() string {
-	return fmt.Sprintf("{Type: %s, Mutable: %v}", g.Type.String(), g.Mutable)
-}
-
 func (g *GlobalVar) UnmarshalWASM(r io.Reader) error {
 	*g = GlobalVar{}
 
@@ -211,16 +203,12 @@ func (g *GlobalVar) UnmarshalWASM(r io.Reader) error {
 		return err
 	}
 
-	m, err := ReadByte(r)
+	m, err := leb128.ReadVarUint32(r)
 	if err != nil {
 		return err
 	}
 
-	if m != 0x00 && m != 0x01 {
-		return errors.New("wasm: invalid global mutable flag")
-	}
-
-	g.Mutable = m == 0x01
+	g.Mutable = m == 1
 
 	return nil
 }
@@ -229,11 +217,14 @@ func (g *GlobalVar) MarshalWASM(w io.Writer) error {
 	if err := g.Type.MarshalWASM(w); err != nil {
 		return err
 	}
-	var m uint8
+	var m uint32
 	if g.Mutable {
 		m = 1
 	}
-	return writeByte(w, m)
+	if _, err := leb128.WriteVarUint32(w, m); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Table describes a table in a Wasm module.
@@ -241,10 +232,6 @@ type Table struct {
 	// The type of elements
 	ElementType ElemType
 	Limits      ResizableLimits
-}
-
-func (t Table) String() string {
-	return fmt.Sprintf("{ElemType: %s, Limits: %s}", t.ElementType.String(), t.Limits.String())
 }
 
 func (t *Table) UnmarshalWASM(r io.Reader) error {
@@ -272,10 +259,6 @@ func (t *Table) MarshalWASM(w io.Writer) error {
 
 type Memory struct {
 	Limits ResizableLimits
-}
-
-func (m Memory) String() string {
-	return fmt.Sprintf("{Limits: %s}", m.Limits.String())
 }
 
 func (m *Memory) UnmarshalWASM(r io.Reader) error {
@@ -325,23 +308,16 @@ func (e External) MarshalWASM(w io.Writer) error {
 
 // ResizableLimits describe the limit of a table or linear memory.
 type ResizableLimits struct {
-	Flags   uint8  // 1 if the Maximum field is valid, 0 otherwise
+	Flags   uint32 // 1 if the Maximum field is valid
 	Initial uint32 // initial length (in units of table elements or wasm pages)
 	Maximum uint32 // If flags is 1, it describes the maximum size of the table or memory
 }
 
-func (lim *ResizableLimits) String() string {
-	return fmt.Sprintf("{Flags:%d, Init:%d, Max:%d}", lim.Flags, lim.Initial, lim.Maximum)
-}
-
 func (lim *ResizableLimits) UnmarshalWASM(r io.Reader) error {
 	*lim = ResizableLimits{}
-	f, err := ReadByte(r)
+	f, err := leb128.ReadVarUint32(r)
 	if err != nil {
 		return err
-	}
-	if f != 0 && f != 1 {
-		return errors.New("wasm: invalid limit flag")
 	}
 	lim.Flags = f
 
@@ -361,18 +337,14 @@ func (lim *ResizableLimits) UnmarshalWASM(r io.Reader) error {
 }
 
 func (lim *ResizableLimits) MarshalWASM(w io.Writer) error {
-	f := lim.Flags
-	if f != 0 && f != 1 {
-		return errors.New("wasm: invalid limit flag")
-	}
-	if _, err := w.Write([]byte{f}); err != nil {
+	if _, err := leb128.WriteVarUint32(w, uint32(lim.Flags)); err != nil {
 		return err
 	}
-	if _, err := leb128.WriteVarUint32(w, lim.Initial); err != nil {
+	if _, err := leb128.WriteVarUint32(w, uint32(lim.Initial)); err != nil {
 		return err
 	}
 	if lim.Flags&0x1 != 0 {
-		if _, err := leb128.WriteVarUint32(w, lim.Maximum); err != nil {
+		if _, err := leb128.WriteVarUint32(w, uint32(lim.Maximum)); err != nil {
 			return err
 		}
 	}

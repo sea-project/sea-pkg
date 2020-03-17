@@ -1,3 +1,7 @@
+// Copyright 2017 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package exec_test
 
 import (
@@ -9,14 +13,13 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/sea-project/sea-pkg/wagon/exec"
-	"github.com/sea-project/sea-pkg/wagon/validate"
-	"github.com/sea-project/sea-pkg/wagon/wasm"
+	"github.com/sea-project/wagon/exec"
+	"github.com/sea-project/wagon/validate"
+	"github.com/sea-project/wagon/wasm"
 )
 
 const (
@@ -25,13 +28,12 @@ const (
 )
 
 type testCase struct {
-	Function          string   `json:"function"`
-	Args              []string `json:"args"`
-	Return            string   `json:"return"`
-	Trap              string   `json:"trap"`
-	RecoverPanic      bool     `json:"recoverpanic,omitempty"`
-	ErrorMsg          string   `json:"errormsg"`
-	MustNativeCompile []int    `json:"must_native_compile,omitempty"`
+	Function     string   `json:"function"`
+	Args         []string `json:"args"`
+	Return       string   `json:"return"`
+	Trap         string   `json:"trap"`
+	RecoverPanic bool     `json:"recoverpanic,omitempty"`
+	ErrorMsg     string   `json:"errormsg"`
 }
 
 type file struct {
@@ -251,7 +253,7 @@ func panics(fn func()) (panicked bool, msg string) {
 	return
 }
 
-func runTest(fileName string, testCases []testCase, t testing.TB, nativeBackend bool, repeat bool) {
+func runTest(fileName string, testCases []testCase, t testing.TB) {
 	file, err := os.Open(fileName)
 	if err != nil {
 		t.Fatal(err)
@@ -266,7 +268,7 @@ func runTest(fileName string, testCases []testCase, t testing.TB, nativeBackend 
 		t.Fatalf("%s: %v", fileName, err)
 	}
 
-	vm, err := exec.NewVM(module, nil, exec.EnableAOT(nativeBackend))
+	vm, err := exec.NewVM(module)
 	if err != nil {
 		t.Fatalf("%s: %v", fileName, err)
 	}
@@ -274,20 +276,6 @@ func runTest(fileName string, testCases []testCase, t testing.TB, nativeBackend 
 	b, ok := t.(*testing.B)
 	for _, testCase := range testCases {
 		var expected interface{}
-
-		if nativeBackend && len(testCase.MustNativeCompile) > 0 {
-			cStats := vm.CompileStats()
-			for _, oc := range testCase.MustNativeCompile {
-				opCode := byte(oc)
-				if _, exists := cStats.Ops[opCode]; !exists {
-					t.Errorf("%s: Op %x is not part of the instruction stream", testCase.Function, oc)
-					continue
-				}
-				if cStats.Ops[opCode].Compiled == 0 {
-					t.Errorf("%s: Op %x was never compiled (stats = %+v)", testCase.Function, oc, cStats.Ops[opCode])
-				}
-			}
-		}
 
 		index := module.Export.Entries[testCase.Function].Index
 		args := parseArgs(testCase.Args)
@@ -317,10 +305,6 @@ func runTest(fileName string, testCases []testCase, t testing.TB, nativeBackend 
 		if ok {
 			times = b.N
 			b.ResetTimer()
-		} else {
-			if repeat {
-				times++
-			}
 		}
 
 		var res interface{}
@@ -328,9 +312,6 @@ func runTest(fileName string, testCases []testCase, t testing.TB, nativeBackend 
 
 		for i := 0; i < times; i++ {
 			res, err = vm.ExecCode(int64(index), args...)
-			if repeat {
-				vm.Restart()
-			}
 		}
 		if ok {
 			b.StopTimer()
@@ -359,7 +340,7 @@ func runTest(fileName string, testCases []testCase, t testing.TB, nativeBackend 
 	}
 }
 
-func testModules(t *testing.T, dir string, repeat bool) {
+func testModules(t *testing.T, dir string) {
 	files := []file{}
 	file, err := os.Open(filepath.Join(dir, "modules.json"))
 	if err != nil {
@@ -381,19 +362,7 @@ func testModules(t *testing.T, dir string, repeat bool) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			runTest(path, testCases, t, false, repeat)
-		})
-		t.Run(fileName+" native", func(t *testing.T) {
-			t.Parallel()
-			if runtime.GOARCH != "amd64" || runtime.GOOS != "linux" {
-				t.SkipNow()
-			}
-
-			path, err := filepath.Abs(fileName)
-			if err != nil {
-				t.Fatal(err)
-			}
-			runTest(path, testCases, t, true, repeat)
+			runTest(path, testCases, t)
 		})
 	}
 }
@@ -419,123 +388,15 @@ func BenchmarkModules(b *testing.B) {
 			if err != nil {
 				b.Fatal(err)
 			}
-			runTest(path, testCases, b, false, false)
+			runTest(path, testCases, b)
 		})
 	}
 }
 
 func TestNonSpec(t *testing.T) {
-	testModules(t, nonSpecTestsDir, false)
+	testModules(t, nonSpecTestsDir)
 }
 
 func TestSpec(t *testing.T) {
-	testModules(t, specTestsDir, false)
-}
-
-func TestVMRestart(t *testing.T) {
-	testModules(t, nonSpecTestsDir, true)
-}
-
-func loadModuleFindFunc(t *testing.B, fileName, funcName string, nativeBackend bool) (*exec.VM, uint32) {
-	file, err := os.Open(fileName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
-
-	module, err := wasm.ReadModule(file, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = validate.VerifyModule(module); err != nil {
-		t.Fatalf("%s: %v", fileName, err)
-	}
-
-	vm, err := exec.NewVM(module, nil, exec.EnableAOT(nativeBackend))
-	if err != nil {
-		t.Fatalf("%s: %v", fileName, err)
-	}
-	return vm, module.Export.Entries[funcName].Index
-}
-
-var benchmarkDummy interface{}
-
-func BenchmarkU64Arithmetic10Interpreted(b *testing.B) {
-	vm, funcIndex := loadModuleFindFunc(b, "testdata/rust-basic.wasm", "loopedArithmeticI64Benchmark", false)
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		benchmarkDummy, _ = vm.ExecCode(int64(funcIndex), 10, 10)
-	}
-}
-
-func BenchmarkU64Arithmetic10Native(b *testing.B) {
-	if runtime.GOARCH != "amd64" {
-		b.SkipNow()
-	}
-
-	vm, funcIndex := loadModuleFindFunc(b, "testdata/rust-basic.wasm", "loopedArithmeticI64Benchmark", true)
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		benchmarkDummy, _ = vm.ExecCode(int64(funcIndex), 10, 10)
-	}
-}
-
-func BenchmarkF64Arithmetic10Interpreted(b *testing.B) {
-	vm, funcIndex := loadModuleFindFunc(b, "testdata/rust-basic.wasm", "loopedArithmeticF64Benchmark", false)
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		benchmarkDummy, _ = vm.ExecCode(int64(funcIndex), 10, 10)
-	}
-}
-
-func BenchmarkF64Arithmetic10Native(b *testing.B) {
-	if runtime.GOARCH != "amd64" {
-		b.SkipNow()
-	}
-
-	vm, funcIndex := loadModuleFindFunc(b, "testdata/rust-basic.wasm", "loopedArithmeticF64Benchmark", true)
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		benchmarkDummy, _ = vm.ExecCode(int64(funcIndex), 10, 10)
-	}
-}
-
-func BenchmarkF32Arithmetic10Interpreted(b *testing.B) {
-	vm, funcIndex := loadModuleFindFunc(b, "testdata/rust-basic.wasm", "loopedArithmeticF32Benchmark", false)
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		benchmarkDummy, _ = vm.ExecCode(int64(funcIndex), 10, 10)
-	}
-}
-
-func BenchmarkF32Arithmetic10Native(b *testing.B) {
-	if runtime.GOARCH != "amd64" {
-		b.SkipNow()
-	}
-
-	vm, funcIndex := loadModuleFindFunc(b, "testdata/rust-basic.wasm", "loopedArithmeticF32Benchmark", true)
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		benchmarkDummy, _ = vm.ExecCode(int64(funcIndex), 10, 10)
-	}
-}
-
-func BenchmarkU64Arithmetic50Interpreted(b *testing.B) {
-	vm, funcIndex := loadModuleFindFunc(b, "testdata/rust-basic.wasm", "loopedArithmeticI64Benchmark", false)
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		benchmarkDummy, _ = vm.ExecCode(int64(funcIndex), 50, 1234)
-	}
-}
-
-func BenchmarkU64Arithmetic50Native(b *testing.B) {
-	if runtime.GOARCH != "amd64" {
-		b.SkipNow()
-	}
-
-	vm, funcIndex := loadModuleFindFunc(b, "testdata/rust-basic.wasm", "loopedArithmeticI64Benchmark", true)
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		benchmarkDummy, _ = vm.ExecCode(int64(funcIndex), 50, 1234)
-	}
+	testModules(t, specTestsDir)
 }

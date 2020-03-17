@@ -1,13 +1,16 @@
+// Copyright 2017 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // package validate provides functions for validating WebAssembly modules.
 package validate
 
 import (
 	"bytes"
-	"errors"
 	"io"
 
-	"github.com/sea-project/sea-pkg/wagon/wasm"
-	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
+	"github.com/sea-project/wagon/wasm"
+	ops "github.com/sea-project/wagon/wasm/operators"
 )
 
 // vibhavp: TODO: We do not verify whether blocks don't access for the parent block, do that.
@@ -24,10 +27,9 @@ func verifyBody(fn *wasm.FunctionSig, body *wasm.FunctionBody, module *wasm.Modu
 		curFunc:     fn,
 	}
 
-	//localVariables := []operand{}
-	localVariables := make([]operand, 0, len(fn.ParamTypes)+len(body.Locals))
+	localVariables := []operand{}
 
-	// Parameters count as local variables too
+	// Paramters count as local variables too
 	// This comment explains how local variables work: https://github.com/WebAssembly/design/issues/1037#issuecomment-293505798
 	for _, entry := range fn.ParamTypes {
 		localVariables = append(localVariables, operand{entry})
@@ -65,7 +67,7 @@ func verifyBody(fn *wasm.FunctionSig, body *wasm.FunctionBody, module *wasm.Modu
 
 		switch op {
 		case ops.If, ops.Block, ops.Loop:
-			sig, err := vm.fetchByte()
+			sig, err := vm.fetchVarInt()
 			if err != nil {
 				return vm, err
 			}
@@ -173,7 +175,7 @@ func verifyBody(fn *wasm.FunctionSig, body *wasm.FunctionBody, module *wasm.Modu
 			vm.setPolymorphic()
 
 		case ops.I32Const:
-			_, err := vm.fetchVarInt()
+			_, err := vm.fetchVarUint()
 			if err != nil {
 				return vm, err
 			}
@@ -296,17 +298,8 @@ func verifyBody(fn *wasm.FunctionSig, body *wasm.FunctionBody, module *wasm.Modu
 			if err != nil {
 				return vm, err
 			}
-			if index >= uint32(len(module.Types.Entries)) {
-				return vm, errors.New("validate: type index out of range in call_indirect")
-			}
 
 			fnExpectSig := module.Types.Entries[index]
-
-			//reserved
-			_, err = vm.fetchVarUint()
-			if err != nil {
-				return vm, err
-			}
 
 			if operand, under := vm.popOperand(); !vm.isPolymorphic() && (under || operand.Type != wasm.ValueTypeI32) {
 				return vm, InvalidTypeError{wasm.ValueTypeI32, operand.Type}

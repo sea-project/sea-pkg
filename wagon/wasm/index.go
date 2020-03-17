@@ -1,7 +1,10 @@
+// Copyright 2017 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package wasm
 
 import (
-	"bytes"
 	"fmt"
 	"reflect"
 )
@@ -35,66 +38,22 @@ func (m *Module) populateFunctions() error {
 		return nil
 	}
 
-	// If present, extract the function names from the custom 'name' section
-	var names NameMap
-	if s := m.Custom(CustomSectionName); s != nil {
-		var nSec NameSection
-		err := nSec.UnmarshalWASM(bytes.NewReader(s.Data))
-		if err != nil {
-			return err
-		}
-		if len(nSec.Types[NameFunction]) > 0 {
-			sub, err := nSec.Decode(NameFunction)
-			if err != nil {
-				return err
-			}
-			funcs, ok := sub.(*FunctionNames)
-			if ok {
-				names = funcs.Names
-			}
-		}
-	}
-
-	// If available, fill in the name field for the imported functions
-	for i := range m.FunctionIndexSpace {
-		// m.FunctionIndexSpace[i].Name = names[uint32(i)]
-		if name, ok := names[uint32(i)]; ok {
-			m.FunctionIndexSpace[i].Name = name
-		}
-	}
-
-	// Add the functions from the wasm itself to the function list
-	numImports := len(m.FunctionIndexSpace)
 	for codeIndex, typeIndex := range m.Function.Types {
 		if int(typeIndex) >= len(m.Types.Entries) {
-			logger.Printf("type_index=%d, types_entries=%d\n", typeIndex, len(m.Types.Entries))
 			return InvalidFunctionIndexError(typeIndex)
 		}
 
-		// Create the main function structure
 		fn := Function{
 			Sig:  &m.Types.Entries[typeIndex],
 			Body: &m.Code.Bodies[codeIndex],
-			Name: names[uint32(codeIndex+numImports)], // Add the name string if we have it
 		}
 
-		logger.Printf("populateFunctions add FunctionIndexSpace: type_index=%d, code_index=%d, sig=%s\n", typeIndex, codeIndex, fn.Sig.String())
 		m.FunctionIndexSpace = append(m.FunctionIndexSpace, fn)
 	}
 
-	logger.Printf("populateFunctons: import_funcs=%d, internal_funcs=%d\n", len(m.imports.Funcs), len(m.Function.Types))
 	funcs := make([]uint32, 0, len(m.Function.Types)+len(m.imports.Funcs))
 	funcs = append(funcs, m.imports.Funcs...)
 	funcs = append(funcs, m.Function.Types...)
-
-	for name, entry := range m.Export.Entries {
-		if entry.Kind == ExternalFunction {
-			index := int(entry.Index)
-			if m.FunctionIndexSpace[index].Name == "" {
-				m.FunctionIndexSpace[index].Name = name
-			}
-		}
-	}
 	m.Function.Types = funcs
 	return nil
 }
@@ -135,9 +94,9 @@ func (m *Module) populateTables() error {
 	}
 
 	for _, elem := range m.Elements.Entries {
-		// the MVP dictates that index should always be zero, we should
+		// the MVP dictates that index should always be zero, we shuold
 		// probably check this
-		if elem.Index >= uint32(len(m.TableIndexSpace)) {
+		if int(elem.Index) >= len(m.TableIndexSpace) {
 			return InvalidTableIndexError(elem.Index)
 		}
 
@@ -145,21 +104,20 @@ func (m *Module) populateTables() error {
 		if err != nil {
 			return err
 		}
-		off, ok := val.(int32)
+		offset, ok := val.(int32)
 		if !ok {
-			return InvalidValueTypeInitExprError{reflect.Int32, reflect.TypeOf(val).Kind()}
+			return InvalidValueTypeInitExprError{reflect.Int32, reflect.TypeOf(offset).Kind()}
 		}
-		offset := uint32(off)
 
-		table := m.TableIndexSpace[elem.Index]
-		//use uint64 to avoid overflow
-		if uint64(offset)+uint64(len(elem.Elems)) > uint64(len(table)) {
-			data := make([]uint32, uint64(offset)+uint64(len(elem.Elems)))
+		table := m.TableIndexSpace[int(elem.Index)]
+		if int(offset)+len(elem.Elems) > len(table) {
+			data := make([]uint32, int(offset)+len(elem.Elems))
 			copy(data[offset:], elem.Elems)
 			copy(data, table)
-			m.TableIndexSpace[elem.Index] = data
+			m.TableIndexSpace[int(elem.Index)] = data
 		} else {
-			copy(table[offset:], elem.Elems)
+			copy(table[int(offset):], elem.Elems)
+			m.TableIndexSpace[int(elem.Index)] = table
 		}
 	}
 
@@ -167,7 +125,7 @@ func (m *Module) populateTables() error {
 	return nil
 }
 
-// GetTableElement returns an element from the tableindex space indexed
+// GetTableElement returns an element from the tableindex  space indexed
 // by the integer index. It returns an error if index is invalid.
 func (m *Module) GetTableElement(index int) (uint32, error) {
 	if index >= len(m.TableIndexSpace[0]) {
@@ -192,20 +150,20 @@ func (m *Module) populateLinearMemory() error {
 		if err != nil {
 			return err
 		}
-		off, ok := val.(int32)
+		offset, ok := val.(int32)
 		if !ok {
-			return InvalidValueTypeInitExprError{reflect.Int32, reflect.TypeOf(val).Kind()}
+			return InvalidValueTypeInitExprError{reflect.Int32, reflect.TypeOf(offset).Kind()}
 		}
-		offset := uint32(off)
 
-		memory := m.LinearMemoryIndexSpace[entry.Index]
-		if uint64(offset)+uint64(len(entry.Data)) > uint64(len(memory)) {
-			data := make([]byte, uint64(offset)+uint64(len(entry.Data)))
-			copy(data, memory)
+		memory := m.LinearMemoryIndexSpace[int(entry.Index)]
+		if int(offset)+len(entry.Data) > len(memory) {
+			data := make([]byte, int(offset)+len(entry.Data))
 			copy(data[offset:], entry.Data)
+			copy(data, memory)
 			m.LinearMemoryIndexSpace[int(entry.Index)] = data
 		} else {
-			copy(memory[offset:], entry.Data)
+			copy(memory[int(offset):], entry.Data)
+			m.LinearMemoryIndexSpace[int(entry.Index)] = memory
 		}
 	}
 

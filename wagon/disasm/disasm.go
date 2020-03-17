@@ -1,3 +1,7 @@
+// Copyright 2017 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // Package disasm provides functions for disassembling WebAssembly bytecode.
 package disasm
 
@@ -8,10 +12,10 @@ import (
 	"io"
 	"math"
 
-	"github.com/sea-project/sea-pkg/wagon/internal/stack"
-	"github.com/sea-project/sea-pkg/wagon/wasm"
-	"github.com/sea-project/sea-pkg/wagon/wasm/leb128"
-	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
+	"github.com/sea-project/wagon/internal/stack"
+	"github.com/sea-project/wagon/wasm"
+	"github.com/sea-project/wagon/wasm/leb128"
+	ops "github.com/sea-project/wagon/wasm/operators"
 )
 
 // Instr describes an instruction, consisting of an operator, with its
@@ -37,7 +41,7 @@ type Instr struct {
 	Branches []StackInfo
 }
 
-// StackInfo stores details about a new stack created or unwound by an instruction.
+// StackInfo stores details about a new stack created or unwinded by an instruction.
 type StackInfo struct {
 	StackTopDiff int64 // The difference between the stack depths at the end of the block
 	PreserveTop  bool  // Whether the value on the top of the stack should be preserved while unwinding
@@ -82,15 +86,12 @@ func isInstrReachable(indexStack [][]int) bool {
 
 var ErrStackUnderflow = errors.New("disasm: stack underflow")
 
-// NewDisassembly disassembles the given function. It also takes the function's
+// Disassemble disassembles the given function. It also takes the function's
 // parent module as an argument for locating any other functions referenced by
 // fn.
-func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error) {
+func Disassemble(fn wasm.Function, module *wasm.Module) (*Disassembly, error) {
 	code := fn.Body.Code
-	instrs, err := Disassemble(code)
-	if err != nil {
-		return nil, err
-	}
+	reader := bytes.NewReader(code)
 	disas := &Disassembly{}
 
 	// A stack of int arrays holding indices to instructions that make the stack
@@ -98,17 +99,29 @@ func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error)
 	// array for the root stack
 	blockPolymorphicOps := [][]int{{}}
 	// a stack of current execution stack depth values, so that the depth for each
-	// stack is maintained independently for calculating discard values
+	// stack is maintained indepepdently for calculating discard values
 	stackDepths := &stack.Stack{}
 	stackDepths.Push(0)
 	blockIndices := &stack.Stack{} // a stack of indices to operators which start new blocks
 	curIndex := 0
 	var lastOpReturn bool
 
-	for _, instr := range instrs {
+	for {
+		op, err := reader.ReadByte()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
 		logger.Printf("stack top is %d", stackDepths.Top())
-		opStr := instr.Op
-		op := opStr.Code
+
+		opStr, err := ops.New(op)
+		if err != nil {
+			return nil, err
+		}
+		instr := Instr{
+			Op: opStr,
+		}
 		if op == ops.End || op == ops.Else {
 			// There are two possible cases here:
 			// 1. The corresponding block/if/loop instruction
@@ -130,7 +143,7 @@ func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error)
 			top := int(stackDepths.Top())
 			top -= len(opStr.Args)
 			stackDepths.SetTop(uint64(top))
-			if top < 0 {
+			if top < -1 {
 				return nil, ErrStackUnderflow
 			}
 			if opStr.Returns != wasm.ValueType(wasm.BlockTypeEmpty) {
@@ -168,11 +181,10 @@ func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error)
 			}
 			if op == ops.End {
 				instr.Block.BlockStartIndex = int(blockStartIndex)
-				//disas.Code[blockStartIndex].Block.IfElseIndex = int(blockStartIndex)
 				disas.Code[blockStartIndex].Block.EndIndex = curIndex
 			} else { // ops.Else
 				instr.Block.ElseIfIndex = int(blockStartIndex)
-				disas.Code[blockStartIndex].Block.IfElseIndex = int(curIndex)
+				disas.Code[blockStartIndex].Block.IfElseIndex = int(blockStartIndex)
 			}
 
 			// The max depth reached while execing the last block
@@ -191,7 +203,7 @@ func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error)
 
 			if !lastOpReturn {
 				elemsDiscard := int(curDepth) - int(prevDepth)
-				if elemsDiscard < 0 {
+				if elemsDiscard < -1 {
 					return nil, ErrStackUnderflow
 				}
 				instr.NewStack = &StackInfo{
@@ -211,8 +223,7 @@ func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error)
 
 			stackDepths.Pop()
 			if op == ops.Else {
-				//stackDepths.Push(stackDepths.Top())
-				stackDepths.Push(prevDepth)
+				stackDepths.Push(0)
 				blockIndices.Push(uint64(curIndex))
 				if !instr.Unreachable {
 					blockPolymorphicOps = append(blockPolymorphicOps, []int{})
@@ -220,7 +231,10 @@ func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error)
 			}
 
 		case ops.Block, ops.Loop, ops.If:
-			sig := instr.Immediates[0].(wasm.BlockType)
+			sig, err := leb128.ReadVarint32(reader)
+			if err != nil {
+				return nil, err
+			}
 			logger.Printf("if, depth is %d", stackDepths.Top())
 			stackDepths.Push(stackDepths.Top())
 			// If this new block is unreachable, its
@@ -235,12 +249,18 @@ func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error)
 			}
 			instr.Block = &BlockInfo{
 				Start:     true,
-				Signature: sig,
+				Signature: wasm.BlockType(sig),
 			}
 
 			blockIndices.Push(uint64(curIndex))
+			instr.Immediates = append(instr.Immediates, wasm.BlockType(sig))
 		case ops.Br, ops.BrIf:
-			depth := instr.Immediates[0].(uint32)
+			depth, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, depth)
+
 			if int(depth) == blockIndices.Len() {
 				instr.IsReturn = true
 			} else {
@@ -272,9 +292,18 @@ func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error)
 			if !instr.Unreachable {
 				stackDepths.SetTop(stackDepths.Top() - 1)
 			}
-			targetCount := instr.Immediates[0].(uint32)
+
+			targetCount, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, targetCount)
 			for i := uint32(0); i < targetCount; i++ {
-				entry := instr.Immediates[i+1].(uint32)
+				entry, err := leb128.ReadVarUint32(reader)
+				if err != nil {
+					return nil, err
+				}
+				instr.Immediates = append(instr.Immediates, entry)
 
 				var info StackInfo
 				if int(entry) == blockIndices.Len() {
@@ -294,7 +323,12 @@ func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error)
 				}
 				instr.Branches = append(instr.Branches, info)
 			}
-			defaultTarget := instr.Immediates[targetCount+1].(uint32)
+
+			defaultTarget, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, defaultTarget)
 
 			var info StackInfo
 			if int(defaultTarget) == blockIndices.Len() {
@@ -315,7 +349,18 @@ func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error)
 			instr.Branches = append(instr.Branches, info)
 			pushPolymorphicOp(blockPolymorphicOps, curIndex)
 		case ops.Call, ops.CallIndirect:
-			index := instr.Immediates[0].(uint32)
+			index, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, index)
+			if op == ops.CallIndirect {
+				reserved, err := leb128.ReadVarUint32(reader)
+				if err != nil {
+					return nil, err
+				}
+				instr.Immediates = append(instr.Immediates, reserved)
+			}
 			if !instr.Unreachable {
 				var sig *wasm.FunctionSig
 				top := int(stackDepths.Top())
@@ -334,6 +379,12 @@ func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error)
 				disas.checkMaxDepth(top)
 			}
 		case ops.GetLocal, ops.SetLocal, ops.TeeLocal, ops.GetGlobal, ops.SetGlobal:
+			index, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, index)
+
 			if !instr.Unreachable {
 				top := stackDepths.Top()
 				switch op {
@@ -348,94 +399,6 @@ func NewDisassembly(fn wasm.Function, module *wasm.Module) (*Disassembly, error)
 					// stack remains unchanged for tee_local
 				}
 			}
-		}
-
-		if op != ops.Return {
-			lastOpReturn = false
-		}
-
-		disas.Code = append(disas.Code, instr)
-		curIndex++
-	}
-
-	for _, instr := range disas.Code {
-		logger.Printf("%v %v", instr.Op.Name, instr.NewStack)
-	}
-
-	return disas, nil
-}
-
-// Disassemble disassembles a given function body into a set of instructions. It won't check operations for validity.
-func Disassemble(code []byte) ([]Instr, error) {
-	reader := bytes.NewReader(code)
-	var out []Instr
-	for {
-		op, err := reader.ReadByte()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-
-		opStr, err := ops.New(op)
-		if err != nil {
-			return nil, err
-		}
-		instr := Instr{
-			Op: opStr,
-		}
-
-		switch op {
-		case ops.Block, ops.Loop, ops.If:
-			sig, err := wasm.ReadByte(reader)
-			if err != nil {
-				return nil, err
-			}
-			instr.Immediates = append(instr.Immediates, wasm.BlockType(sig))
-		case ops.Br, ops.BrIf:
-			depth, err := leb128.ReadVarUint32(reader)
-			if err != nil {
-				return nil, err
-			}
-			instr.Immediates = append(instr.Immediates, depth)
-		case ops.BrTable:
-			targetCount, err := leb128.ReadVarUint32(reader)
-			if err != nil {
-				return nil, err
-			}
-			instr.Immediates = append(instr.Immediates, targetCount)
-			for i := uint32(0); i < targetCount; i++ {
-				entry, err := leb128.ReadVarUint32(reader)
-				if err != nil {
-					return nil, err
-				}
-				instr.Immediates = append(instr.Immediates, entry)
-			}
-
-			defaultTarget, err := leb128.ReadVarUint32(reader)
-			if err != nil {
-				return nil, err
-			}
-			instr.Immediates = append(instr.Immediates, defaultTarget)
-		case ops.Call, ops.CallIndirect:
-			index, err := leb128.ReadVarUint32(reader)
-			if err != nil {
-				return nil, err
-			}
-			instr.Immediates = append(instr.Immediates, index)
-			if op == ops.CallIndirect {
-				reserved, err := leb128.ReadVarUint32(reader)
-				if err != nil {
-					return nil, err
-				}
-				instr.Immediates = append(instr.Immediates, reserved)
-			}
-		case ops.GetLocal, ops.SetLocal, ops.TeeLocal, ops.GetGlobal, ops.SetGlobal:
-			index, err := leb128.ReadVarUint32(reader)
-			if err != nil {
-				return nil, err
-			}
-			instr.Immediates = append(instr.Immediates, index)
 		case ops.I32Const:
 			i, err := leb128.ReadVarint32(reader)
 			if err != nil {
@@ -482,7 +445,20 @@ func Disassemble(code []byte) ([]Instr, error) {
 			}
 			instr.Immediates = append(instr.Immediates, uint8(res))
 		}
-		out = append(out, instr)
+
+		if op != ops.Return {
+			lastOpReturn = false
+		}
+
+		disas.Code = append(disas.Code, instr)
+		curIndex++
 	}
-	return out, nil
+
+	if logging {
+		for _, instr := range disas.Code {
+			logger.Printf("%v %v", instr.Op.Name, instr.NewStack)
+		}
+	}
+
+	return disas, nil
 }

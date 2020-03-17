@@ -1,3 +1,7 @@
+// Copyright 2017 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package exec
 
 import (
@@ -30,36 +34,24 @@ func (vm *VM) i32Mul() {
 func (vm *VM) i32DivS() {
 	v2 := vm.popInt32()
 	v1 := vm.popInt32()
-	if v2 == 0 {
-		panic("DivZero")
-	}
 	vm.pushInt32(v1 / v2)
 }
 
 func (vm *VM) i32DivU() {
 	v2 := vm.popUint32()
 	v1 := vm.popUint32()
-	if v2 == 0 {
-		panic("DivZero")
-	}
 	vm.pushUint32(v1 / v2)
 }
 
 func (vm *VM) i32RemS() {
 	v2 := vm.popInt32()
 	v1 := vm.popInt32()
-	if v2 == 0 {
-		panic("DivZero")
-	}
 	vm.pushInt32(v1 % v2)
 }
 
 func (vm *VM) i32RemU() {
 	v2 := vm.popUint32()
 	v1 := vm.popUint32()
-	if v2 == 0 {
-		panic("DivZero")
-	}
 	vm.pushUint32(v1 % v2)
 }
 
@@ -202,36 +194,24 @@ func (vm *VM) i64Mul() {
 func (vm *VM) i64DivS() {
 	v2 := vm.popInt64()
 	v1 := vm.popInt64()
-	if v2 == 0 {
-		panic("DivZero")
-	}
 	vm.pushInt64(v1 / v2)
 }
 
 func (vm *VM) i64DivU() {
 	v2 := vm.popUint64()
 	v1 := vm.popUint64()
-	if v2 == 0 {
-		panic("DivZero")
-	}
 	vm.pushUint64(v1 / v2)
 }
 
 func (vm *VM) i64RemS() {
 	v2 := vm.popInt64()
 	v1 := vm.popInt64()
-	if v2 == 0 {
-		panic("DivZero")
-	}
 	vm.pushInt64(v1 % v2)
 }
 
 func (vm *VM) i64RemU() {
 	v2 := vm.popUint64()
 	v1 := vm.popUint64()
-	if v2 == 0 {
-		panic("DivZero")
-	}
 	vm.pushUint64(v1 % v2)
 }
 

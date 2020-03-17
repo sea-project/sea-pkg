@@ -1,7 +1,11 @@
+// Copyright 2017 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package operators
 
 import (
-	"github.com/sea-project/sea-pkg/wagon/wasm"
+	"github.com/sea-project/wagon/wasm"
 )
 
 var (
@@ -30,8 +34,6 @@ var (
 	I64Store16 = newOp(0x3d, "i64.store16", []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI32}, noReturn)
 	I64Store32 = newOp(0x3e, "i64.store32", []wasm.ValueType{wasm.ValueTypeI64, wasm.ValueTypeI32}, noReturn)
 
-	// TODO: rename operations accordingly
-
-	CurrentMemory = newOp(0x3f, "memory.size", nil, wasm.ValueTypeI32)
-	GrowMemory    = newOp(0x40, "memory.grow", []wasm.ValueType{wasm.ValueTypeI32}, wasm.ValueTypeI32)
+	CurrentMemory = newOp(0x3f, "current_memory", nil, wasm.ValueTypeI32)
+	GrowMemory    = newOp(0x40, "grow_memory", []wasm.ValueType{wasm.ValueTypeI32}, wasm.ValueTypeI32)
 )

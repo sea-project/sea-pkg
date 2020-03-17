@@ -1116,41 +1116,5 @@
         "trap": "i32:1"
       }
     ]
-  },
-  {
-    "file": "rust-basic.wasm",
-    "tests": [
-      {
-        "function": "x2_plus_y2_minus_13",
-        "args": ["i64:2", "i64:6"],
-        "return": "i64:28",
-        "_comment": "Checks native compilation did occur for i64:const,add,sub,mul,div,shl,and",
-        "must_native_compile": [66, 124, 125, 126, 128, 134, 131]
-      },
-      {
-        "function": "loopedArithmeticI64Benchmark",
-        "args": ["i64:8", "i64:16"],
-        "return": "i64:1989840",
-        "_comment": "Checks native compilation did occur for i64:const,add,sub,mul,div,shl,and,set_local",
-        "must_native_compile": [66, 124, 125, 126, 128, 134, 131, 33]
-      },
-      {
-        "function": "loopedArithmeticI64Benchmark",
-        "args": ["i64:80", "i64:7"],
-        "return": "i64:110262743"
-      },
-      {
-        "function": "loopedArithmeticF64Benchmark",
-        "args": ["i64:80", "f64:7"],
-        "return": "f64:2.7766899067423496e+26",
-        "_comment": "Checks native compilation did occur for i64:const,add,f64:const,add,sub,mul,div,gt",
-        "must_native_compile": [66, 124, 125, 68, 160, 161, 162, 163, 100]
-      },
-      {
-        "function": "loopedArithmeticF32Benchmark",
-        "args": ["i64:80", "f32:7"],
-        "return": "f32:2.7766849e+26"
-      }
-    ]
   }
 ]

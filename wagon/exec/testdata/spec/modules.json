@@ -2427,7 +2427,7 @@
         "recoverpanic": false
       },
       {
-        "trap": "exec: reached unreachable",
+        "errormsg": "exec: reached unreachable",
         "args": [],
         "function": "main",
         "recoverpanic": true
@@ -3473,7 +3473,7 @@
   },
   {
     "file": "nop.wasm",
-    "tests": [
+    "test": [
       {
         "return": "i32:1",
         "args": [],

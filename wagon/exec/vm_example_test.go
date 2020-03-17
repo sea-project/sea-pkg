@@ -1,12 +1,18 @@
+// Copyright 2018 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package exec_test
 
 import (
 	"bytes"
 	"fmt"
-	"github.com/sea-project/sea-pkg/wagon/exec"
-	"github.com/sea-project/sea-pkg/wagon/wasm"
 	"io/ioutil"
 	"log"
+	"reflect"
+
+	"github.com/sea-project/wagon/exec"
+	"github.com/sea-project/wagon/wasm"
 )
 
 func ExampleVM_add() {
@@ -38,9 +44,9 @@ func ExampleVM_add() {
 			// create a whole new module, called "go", from scratch.
 			// this module will contain one exported function "print",
 			// implemented itself in pure Go.
-			//print := func(proc *exec.Process, v int32) {
-			//	fmt.Printf("result = %v\n", v)
-			//}
+			print := func(proc *exec.Process, v int32) {
+				fmt.Printf("result = %v\n", v)
+			}
 
 			m := wasm.NewModule()
 			m.Types = &wasm.SectionTypes{
@@ -53,8 +59,8 @@ func ExampleVM_add() {
 			}
 			m.FunctionIndexSpace = []wasm.Function{
 				{
-					Sig: &m.Types.Entries[0],
-					//Host: reflect.ValueOf(print),
+					Sig:  &m.Types.Entries[0],
+					Host: reflect.ValueOf(print),
 					Body: &wasm.FunctionBody{}, // create a dummy wasm body (the actual value will be taken from Host.)
 				},
 			}
@@ -76,7 +82,7 @@ func ExampleVM_add() {
 		log.Fatalf("could not read module: %v", err)
 	}
 
-	vm, err := exec.NewVM(m, nil)
+	vm, err := exec.NewVM(m)
 	if err != nil {
 		log.Fatalf("could not create wagon vm: %v", err)
 	}
@@ -112,7 +118,7 @@ func ExampleVM_add() {
 // compileWast2Wasm fakes a compilation pass from WAST to WASM.
 //
 // When wagon gets a WAST parser, this function will be running an actual compilation.
-// See: https://github.com/sea-project/sea-pkg/wagon/issues/34
+// See: https://github.com/sea-project/wagon/issues/34
 func compileWast2Wasm(fname string) ([]byte, error) {
 	switch fname {
 	case "testdata/add-ex.wast":

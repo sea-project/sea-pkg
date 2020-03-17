@@ -1,3 +1,7 @@
+// Copyright 2017 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package main
 
 import (
@@ -10,9 +14,9 @@ import (
 	"os"
 	"sort"
 
-	"github.com/sea-project/sea-pkg/wagon/disasm"
-	"github.com/sea-project/sea-pkg/wagon/wasm"
-	"github.com/sea-project/sea-pkg/wagon/wasm/leb128"
+	"github.com/sea-project/wagon/disasm"
+	"github.com/sea-project/wagon/wasm"
+	"github.com/sea-project/wagon/wasm/leb128"
 )
 
 // TODO: track the number of imported funcs,memories,tables and globals to adjust
@@ -60,7 +64,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	//wasm.SetDebugMode(*flagVerbose)
+	wasm.SetDebugMode(*flagVerbose)
 
 	w := os.Stdout
 	for i, fname := range flag.Args() {
@@ -105,49 +109,49 @@ func printHeaders(w io.Writer, fname string, m *wasm.Module) {
 	if sec := m.Types; sec != nil {
 		fmt.Fprintf(w, hdrfmt,
 			sec.ID.String(),
-			sec.RawSection.Start, sec.RawSection.End, len(sec.RawSection.Bytes),
+			sec.RawSection.Start, sec.RawSection.End, sec.RawSection.PayloadLen,
 			len(sec.Entries),
 		)
 	}
 	if sec := m.Import; sec != nil {
 		fmt.Fprintf(w, hdrfmt,
 			sec.ID.String(),
-			sec.RawSection.Start, sec.RawSection.End, len(sec.RawSection.Bytes),
+			sec.RawSection.Start, sec.RawSection.End, sec.RawSection.PayloadLen,
 			len(sec.Entries),
 		)
 	}
 	if sec := m.Function; sec != nil {
 		fmt.Fprintf(w, hdrfmt,
 			sec.ID.String(),
-			sec.RawSection.Start, sec.RawSection.End, len(sec.RawSection.Bytes),
+			sec.RawSection.Start, sec.RawSection.End, sec.RawSection.PayloadLen,
 			len(sec.Types),
 		)
 	}
 	if sec := m.Table; sec != nil {
 		fmt.Fprintf(w, hdrfmt,
 			sec.ID.String(),
-			sec.RawSection.Start, sec.RawSection.End, len(sec.RawSection.Bytes),
+			sec.RawSection.Start, sec.RawSection.End, sec.RawSection.PayloadLen,
 			len(sec.Entries),
 		)
 	}
 	if sec := m.Memory; sec != nil {
 		fmt.Fprintf(w, hdrfmt,
 			sec.ID.String(),
-			sec.RawSection.Start, sec.RawSection.End, len(sec.RawSection.Bytes),
+			sec.RawSection.Start, sec.RawSection.End, sec.RawSection.PayloadLen,
 			len(sec.Entries),
 		)
 	}
 	if sec := m.Global; sec != nil {
 		fmt.Fprintf(w, hdrfmt,
 			sec.ID.String(),
-			sec.RawSection.Start, sec.RawSection.End, len(sec.RawSection.Bytes),
+			sec.RawSection.Start, sec.RawSection.End, sec.RawSection.PayloadLen,
 			len(sec.Globals),
 		)
 	}
 	if sec := m.Export; sec != nil {
 		fmt.Fprintf(w, hdrfmt,
 			sec.ID.String(),
-			sec.RawSection.Start, sec.RawSection.End, len(sec.RawSection.Bytes),
+			sec.RawSection.Start, sec.RawSection.End, sec.RawSection.PayloadLen,
 			len(sec.Entries),
 		)
 	}
@@ -155,35 +159,35 @@ func printHeaders(w io.Writer, fname string, m *wasm.Module) {
 		hdrfmt := "%9s start=0x%08x end=0x%08x (size=0x%08x) start: %d\n"
 		fmt.Fprintf(w, hdrfmt,
 			sec.ID.String(),
-			sec.RawSection.Start, sec.RawSection.End, len(sec.RawSection.Bytes),
+			sec.RawSection.Start, sec.RawSection.End, sec.RawSection.PayloadLen,
 			sec.Index,
 		)
 	}
 	if sec := m.Elements; sec != nil {
 		fmt.Fprintf(w, hdrfmt,
 			sec.ID.String(),
-			sec.RawSection.Start, sec.RawSection.End, len(sec.RawSection.Bytes),
+			sec.RawSection.Start, sec.RawSection.End, sec.RawSection.PayloadLen,
 			len(sec.Entries),
 		)
 	}
 	if sec := m.Code; sec != nil {
 		fmt.Fprintf(w, hdrfmt,
 			sec.ID.String(),
-			sec.RawSection.Start, sec.RawSection.End, len(sec.RawSection.Bytes),
+			sec.RawSection.Start, sec.RawSection.End, sec.RawSection.PayloadLen,
 			len(sec.Bodies),
 		)
 	}
 	if sec := m.Data; sec != nil {
 		fmt.Fprintf(w, hdrfmt,
 			sec.ID.String(),
-			sec.RawSection.Start, sec.RawSection.End, len(sec.RawSection.Bytes),
+			sec.RawSection.Start, sec.RawSection.End, sec.RawSection.PayloadLen,
 			len(sec.Entries),
 		)
 	}
-	for _, sec := range m.Customs {
+	for _, sec := range m.Other {
 		fmt.Fprintf(w, "%9s start=0x%08x end=0x%08x (size=0x%08x) %q\n",
 			sec.ID.String(),
-			sec.Start, sec.End, len(sec.Bytes),
+			sec.Start, sec.End, sec.PayloadLen,
 			sec.Name,
 		)
 	}
@@ -193,12 +197,48 @@ func printFull(w io.Writer, fname string, m *wasm.Module) {
 	fmt.Fprintf(w, "%s: module version: %#x\n\n", fname, m.Version)
 
 	hdrfmt := "contents of section %s:\n"
-	sections := m.Sections
+	var sections []*wasm.RawSection
+
+	if sec := m.Types; sec != nil {
+		sections = append(sections, &sec.RawSection)
+	}
+	if sec := m.Import; sec != nil {
+		sections = append(sections, &sec.RawSection)
+	}
+	if sec := m.Function; sec != nil {
+		sections = append(sections, &sec.RawSection)
+	}
+	if sec := m.Table; sec != nil {
+		sections = append(sections, &sec.RawSection)
+	}
+	if sec := m.Memory; sec != nil {
+		sections = append(sections, &sec.RawSection)
+	}
+	if sec := m.Global; sec != nil {
+		sections = append(sections, &sec.RawSection)
+	}
+	if sec := m.Export; sec != nil {
+		sections = append(sections, &sec.RawSection)
+	}
+	if sec := m.Start; sec != nil {
+		sections = append(sections, &sec.RawSection)
+	}
+	if sec := m.Elements; sec != nil {
+		sections = append(sections, &sec.RawSection)
+	}
+	if sec := m.Code; sec != nil {
+		sections = append(sections, &sec.RawSection)
+	}
+	if sec := m.Data; sec != nil {
+		sections = append(sections, &sec.RawSection)
+	}
+	for i := range m.Other {
+		sections = append(sections, &m.Other[i])
+	}
 
 	for _, sec := range sections {
-		rs := sec.GetRawSection()
-		fmt.Fprintf(w, hdrfmt, rs.ID.String())
-		fmt.Fprintln(w, hexDump(rs.Bytes, uint(rs.Start)))
+		fmt.Fprintf(w, hdrfmt, sec.ID.String())
+		fmt.Fprintln(w, hexDump(sec.Bytes, uint(sec.Start)))
 	}
 }
 
@@ -208,7 +248,7 @@ func printDis(w io.Writer, fname string, m *wasm.Module) {
 	for i := range m.Function.Types {
 		f := m.GetFunction(i)
 		fmt.Fprintf(w, "\nfunc[%d]: %v\n", i, f.Sig)
-		dis, err := disasm.NewDisassembly(*f, m)
+		dis, err := disasm.Disassemble(*f, m)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -332,7 +372,7 @@ func printDetails(w io.Writer, fname string, m *wasm.Module) {
 			fmt.Fprintf(w, "%s", hexDump(e.Data, 0))
 		}
 	}
-	for _, sec := range m.Customs {
+	for _, sec := range m.Other {
 		fmt.Fprintf(w, "%v:\n", sec.ID)
 		fmt.Fprintf(w, " - name: %q\n", sec.Name)
 		raw := bytes.NewReader(sec.Bytes[6:])

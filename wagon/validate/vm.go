@@ -1,3 +1,7 @@
+// Copyright 2017 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package validate
 
 import (
@@ -5,9 +9,9 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/sea-project/sea-pkg/wagon/wasm"
-	"github.com/sea-project/sea-pkg/wagon/wasm/leb128"
-	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
+	"github.com/sea-project/wagon/wasm"
+	"github.com/sea-project/wagon/wasm/leb128"
+	ops "github.com/sea-project/wagon/wasm/operators"
 )
 
 // mockVM is a minimal implementation of a virtual machine to
@@ -19,13 +23,13 @@ type mockVM struct {
 
 	code *bytes.Reader
 
-	polymorphic bool    // whether the base implicit block has a polymorphic stack
+	polymorphic bool    // whether the base implict block has a polymorphic stack
 	blocks      []block // a stack of encountered blocks
 
 	curFunc *wasm.FunctionSig
 }
 
-// a block represents an instruction sequence preceded by a control flow operator
+// a block reprsents an instruction sequence preceeded by a control flow operator
 // it is used to verify that the block signature set by the operator is the correct
 // one when the block ends
 type block struct {
@@ -43,10 +47,6 @@ func (vm *mockVM) fetchVarUint() (uint32, error) {
 
 func (vm *mockVM) fetchVarInt() (int32, error) {
 	return leb128.ReadVarint32(vm.code)
-}
-
-func (vm *mockVM) fetchByte() (byte, error) {
-	return vm.code.ReadByte()
 }
 
 func (vm *mockVM) fetchVarInt64() (int64, error) {
@@ -102,8 +102,8 @@ func (vm *mockVM) canBranch(depth int) error {
 	// on the stack.
 	if block == nil {
 		if depth == len(vm.blocks) {
-			// equivalent to a `return', as the function
-			// body is an "implicit" block
+			//equivalent to a `return', as the function
+			//body is an "implicit" block
 			if len(vm.curFunc.ReturnTypes) != 0 {
 				blockType = wasm.BlockType(vm.curFunc.ReturnTypes[0])
 			}
@@ -198,7 +198,7 @@ func (vm *mockVM) adjustStack(op ops.Op) error {
 
 // setPolymorphic sets the current block as having a polymorphic stack
 // blocks created under it will be polymorphic too. All type-checking
-// is ignored in a polymorphic stack.
+// is ignored in a polymorhpic stack.
 // (See https://github.com/WebAssembly/design/blob/27ac254c854994103c24834a994be16f74f54186/Semantics.md#validation)
 func (vm *mockVM) setPolymorphic() {
 	if len(vm.blocks) == 0 {

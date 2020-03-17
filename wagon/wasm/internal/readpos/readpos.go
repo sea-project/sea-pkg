@@ -1,3 +1,7 @@
+// Copyright 2017 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package readpos
 
 import (
@@ -21,7 +25,6 @@ func (r *ReadPos) Read(p []byte) (int, error) {
 // ReadByte implements the io.ByteReader interface
 func (r *ReadPos) ReadByte() (byte, error) {
 	p := make([]byte, 1)
-	n, err := r.R.Read(p)
-	r.CurPos += int64(n)
+	_, err := r.R.Read(p)
 	return p[0], err
 }

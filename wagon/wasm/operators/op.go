@@ -1,12 +1,15 @@
+// Copyright 2017 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // Package operators provides all operators used by WebAssembly bytecode,
 // together with their parameter and return type(s).
 package operators
 
 import (
-	"bytes"
 	"fmt"
 
-	"github.com/sea-project/sea-pkg/wagon/wasm"
+	"github.com/sea-project/wagon/wasm"
 )
 
 var (
@@ -29,27 +32,6 @@ type Op struct {
 
 func (o Op) IsValid() bool {
 	return o.Name != ""
-}
-
-func (o Op) String() string {
-	buf := bytes.NewBuffer(nil)
-	if o.Returns == noReturn {
-		buf.WriteString("nil ")
-	} else {
-		buf.WriteString(o.Returns.String())
-		buf.WriteString(" ")
-	}
-	buf.WriteString(o.Name)
-	buf.WriteString("(")
-	for i, arg := range o.Args {
-		if i > 0 {
-			buf.WriteString(", ")
-		}
-		buf.WriteString(arg.String())
-	}
-	buf.WriteString(")")
-
-	return buf.String()
 }
 
 func newOp(code byte, name string, args []wasm.ValueType, returns wasm.ValueType) byte {
@@ -92,8 +74,7 @@ func (e InvalidOpcodeError) Error() string {
 // If code is invalid, an ErrInvalidOpcode is returned.
 func New(code byte) (Op, error) {
 	var op Op
-
-	if int(code) >= len(ops) || internalOpcodes[code] {
+	if int(code) >= len(ops) {
 		return op, InvalidOpcodeError(code)
 	}
 
@@ -102,17 +83,4 @@ func New(code byte) (Op, error) {
 		return op, InvalidOpcodeError(code)
 	}
 	return op, nil
-}
-
-// OpSignature get the signature by operation code.
-func OpSignature(code byte) string {
-	if int(code) >= len(ops) {
-		return InvalidOpcodeError(code).Error()
-	}
-
-	if !ops[code].IsValid() {
-		return InvalidOpcodeError(code).Error()
-	}
-
-	return ops[code].String()
 }

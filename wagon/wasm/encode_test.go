@@ -1,22 +1,18 @@
+// Copyright 2018 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package wasm_test
 
 import (
 	"bytes"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 
-	"github.com/sea-project/sea-pkg/wagon/wasm"
+	"github.com/sea-project/wagon/wasm"
 )
-
-var skipModuleFilenames = map[string]bool{
-	// Contains debug information section of type Custom. Custom types
-	// can be inserted in any order in the sequence, hence the encodings
-	// mismatch is valid.
-	"rust-basic.wasm": true,
-}
 
 func TestEncode(t *testing.T) {
 	for _, dir := range testPaths {
@@ -25,10 +21,6 @@ func TestEncode(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, fname := range fnames {
-			if skipModuleFilenames[path.Base(fname)] {
-				continue
-			}
-
 			name := fname
 			t.Run(filepath.Base(name), func(t *testing.T) {
 				raw, err := ioutil.ReadFile(name)

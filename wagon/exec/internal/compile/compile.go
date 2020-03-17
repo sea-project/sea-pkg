@@ -1,3 +1,7 @@
+// Copyright 2017 The go-interpreter Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // Package compile is used internally by wagon to convert standard structured
 // WebAssembly bytecode into an unstructured form suitable for execution by
 // it's VM.
@@ -38,8 +42,9 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/sea-project/sea-pkg/wagon/disasm"
-	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
+	"github.com/sea-project/wagon/disasm"
+	ops "github.com/sea-project/wagon/wasm/operators"
+	"github.com/sea-project/wagon/vnt"
 )
 
 // A small note on the usage of discard instructions:
@@ -76,41 +81,6 @@ var (
 	OpDiscardPreserveTop byte = 0x05
 )
 
-const (
-	// instAndInt64Len represents the number of bytes consumed by a wire
-	// representation of an instruction and an int64.
-	instAndInt64Len = 9
-	// ifBranchLen represents the number of bytes needed to represent a
-	// conditional if branch.
-	// Byte 0     - represents the opcode.
-	// Byte 1-8   - represents the branch address.
-	// Byte 9     - 1 if the top of stack should be preserved, 0 otherwise.
-	// Byte 10-18 - number of stack positions to discard.
-	ifBranchLen = 18
-)
-
-// Target is the "target" of a br_table instruction.
-// Unlike other control instructions, br_table does jumps and discarding all
-// by itself.
-type Target struct {
-	Addr        int64 // The absolute address of the target
-	Discard     int64 // The number of elements to discard
-	PreserveTop bool  // Whether the top of the stack is to be preserved
-	Return      bool  // Whether to return in order to take this branch/target
-}
-
-// BranchTable is the structure pointed to by a rewritten br_table instruction.
-// A rewritten br_table instruction is of the format:
-//     br_table <table_index>
-// where <table_index> is the index to an array of
-// BranchTable objects stored by the VM.
-type BranchTable struct {
-	Targets       []Target // A list of targets, br_table pops an int value, and jumps to Targets[val]
-	DefaultTarget Target   // If val > len(Targets), the VM will jump here
-	patchedAddrs  []int64  // A list of already patched addresses
-	blocksLen     int      // The length of the blocks map in Compile when this table was initialized
-}
-
 // block stores the information relevant for a block created by a control operator
 // sequence (if...else...end, loop...end, and block...end)
 type block struct {
@@ -137,55 +107,18 @@ type block struct {
 	patchOffsets []int64 // A list of offsets in the bytecode stream that need to be patched with the correct jump addresses
 
 	discard      disasm.StackInfo // Information about the stack created in this block, used while creating Discard instructions
-	branchTables []*BranchTable   // All branch tables that were defined in this block.
-}
-
-type Label struct {
-	PC    int
-	Index int
-	Op    byte
-}
-
-// BytecodeMetadata encapsulates metadata about a bytecode stream.
-type BytecodeMetadata struct {
-	BranchTables []*BranchTable
-	Instructions []InstructionMetadata
-
-	// Inbound jumps - used by the AOT/JIT scanner to
-	// avoid generating native code which has an inbound
-	// jump target somewhere deep inside.
-	InboundTargets map[int64]struct{}
-
-	LabelTables map[int]Label
+	branchTables []*vnt.BranchTable   // All branch tables that were defined in this block.
 }
 
 // Compile rewrites WebAssembly bytecode from its disassembly.
 // TODO(vibhavp): Add options for optimizing code. Operators like i32.reinterpret/f32
 // are no-ops, and can be safely removed.
-func Compile(disassembly []disasm.Instr) ([]byte, *BytecodeMetadata) {
+func Compile(disassembly []disasm.Instr) ([]byte, []*vnt.BranchTable) {
 	buffer := new(bytes.Buffer)
-	metadata := make([]InstructionMetadata, 0, len(disassembly))
-	branchTables := []*BranchTable{}
-	inboundTargets := make(map[int64]struct{})
-	labelTables := make(map[int]Label)
-	labeln := 0
+	branchTables := []*vnt.BranchTable{}
 
 	curBlockDepth := -1
 	blocks := make(map[int]*block) // maps nesting depths (labels) to blocks
-
-	// Helper closure - shorthand to emit instruction metadata.
-	emitMetadata := func(op byte, index, size int) {
-		metadata = append(metadata, InstructionMetadata{
-			Op:    op,
-			Start: index,
-			Size:  size,
-		})
-	}
-
-	emitLabel := func(pc int, op byte) {
-		labelTables[pc] = Label{PC: pc, Index: labeln, Op: op}
-		labeln++
-	}
 
 	blocks[-1] = &block{}
 	for _, instr := range disassembly {
@@ -200,7 +133,6 @@ func Compile(disassembly []disasm.Instr) ([]byte, *BytecodeMetadata) {
 			instr.Immediates = []interface{}{instr.Immediates[1].(uint32)}
 		case ops.If:
 			curBlockDepth++
-			emitMetadata(OpJmpZ, buffer.Len(), instAndInt64Len)
 			buffer.WriteByte(OpJmpZ)
 			blocks[curBlockDepth] = &block{
 				ifBlock:        true,
@@ -231,16 +163,13 @@ func Compile(disassembly []disasm.Instr) ([]byte, *BytecodeMetadata) {
 			ifInstr := disassembly[instr.Block.ElseIfIndex] // the corresponding `if` instruction for this else
 			if ifInstr.NewStack != nil && ifInstr.NewStack.StackTopDiff != 0 {
 				// add code for jumping out of a taken if branch
-				op := OpDiscard
 				if ifInstr.NewStack.PreserveTop {
-					op = OpDiscardPreserveTop
+					buffer.WriteByte(OpDiscardPreserveTop)
+				} else {
+					buffer.WriteByte(OpDiscard)
 				}
-
-				emitMetadata(op, buffer.Len(), instAndInt64Len)
-				buffer.WriteByte(op)
 				binary.Write(buffer, binary.LittleEndian, ifInstr.NewStack.StackTopDiff)
 			}
-			emitMetadata(OpJmp, buffer.Len(), instAndInt64Len)
 			buffer.WriteByte(OpJmp)
 			ifBlockEndOffset := int64(buffer.Len())
 			binary.Write(buffer, binary.LittleEndian, int64(0))
@@ -249,7 +178,7 @@ func Compile(disassembly []disasm.Instr) ([]byte, *BytecodeMetadata) {
 			ifBlock := blocks[curBlockDepth]
 			code := buffer.Bytes()
 
-			buffer = patchOffset(code, ifBlock.elseAddrOffset, curOffset, inboundTargets)
+			buffer = patchOffset(code, ifBlock.elseAddrOffset, curOffset)
 			// this is no longer an if block
 			ifBlock.ifBlock = false
 			ifBlock.patchOffsets = append(ifBlock.patchOffsets, ifBlockEndOffset)
@@ -261,15 +190,14 @@ func Compile(disassembly []disasm.Instr) ([]byte, *BytecodeMetadata) {
 			if instr.NewStack.StackTopDiff != 0 {
 				// when exiting a block, discard elements to
 				// restore stack height.
-				op := OpDiscard
 				if instr.NewStack.PreserveTop {
 					// this is true when the block has a
 					// signature, and therefore pushes
 					// a value on to the stack
-					op = OpDiscardPreserveTop
+					buffer.WriteByte(OpDiscardPreserveTop)
+				} else {
+					buffer.WriteByte(OpDiscard)
 				}
-				emitMetadata(op, buffer.Len(), instAndInt64Len)
-				buffer.WriteByte(op)
 				binary.Write(buffer, binary.LittleEndian, instr.NewStack.StackTopDiff)
 			}
 
@@ -277,22 +205,17 @@ func Compile(disassembly []disasm.Instr) ([]byte, *BytecodeMetadata) {
 				block.offset = int64(buffer.Len())
 				if block.ifBlock {
 					code := buffer.Bytes()
-					buffer = patchOffset(code, block.elseAddrOffset, int64(block.offset), inboundTargets)
+					buffer = patchOffset(code, block.elseAddrOffset, int64(block.offset))
 				}
 			}
 
 			for _, offset := range block.patchOffsets {
 				code := buffer.Bytes()
-				buffer = patchOffset(code, offset, block.offset, inboundTargets)
-				emitLabel(int(block.offset), ops.Block)
+				buffer = patchOffset(code, offset, block.offset)
 			}
 
 			for _, table := range block.branchTables {
-				table.patchTable(table.blocksLen-depth-1, int64(block.offset), inboundTargets)
-				for _, target := range table.Targets {
-					emitLabel(int(target.Addr), ops.BrTable)
-				}
-				emitLabel(int(table.DefaultTarget.Addr), ops.BrTable)
+				table.PatchTable(table.BlocksLen-depth-1, int64(block.offset))
 			}
 
 			delete(blocks, curBlockDepth)
@@ -300,15 +223,13 @@ func Compile(disassembly []disasm.Instr) ([]byte, *BytecodeMetadata) {
 			continue
 		case ops.Br:
 			if instr.NewStack != nil && instr.NewStack.StackTopDiff != 0 {
-				op := OpDiscard
 				if instr.NewStack.PreserveTop {
-					op = OpDiscardPreserveTop
+					buffer.WriteByte(OpDiscardPreserveTop)
+				} else {
+					buffer.WriteByte(OpDiscard)
 				}
-				emitMetadata(op, buffer.Len(), instAndInt64Len)
-				buffer.WriteByte(op)
 				binary.Write(buffer, binary.LittleEndian, instr.NewStack.StackTopDiff)
 			}
-			emitMetadata(OpJmp, buffer.Len(), instAndInt64Len)
 			buffer.WriteByte(OpJmp)
 			label := int(instr.Immediates[0].(uint32))
 			block := blocks[curBlockDepth-int(label)]
@@ -317,7 +238,6 @@ func Compile(disassembly []disasm.Instr) ([]byte, *BytecodeMetadata) {
 			binary.Write(buffer, binary.LittleEndian, int64(0))
 			continue
 		case ops.BrIf:
-			emitMetadata(OpJmpNz, buffer.Len(), ifBranchLen)
 			buffer.WriteByte(OpJmpNz)
 			label := int(instr.Immediates[0].(uint32))
 			block := blocks[curBlockDepth-int(label)]
@@ -337,13 +257,13 @@ func Compile(disassembly []disasm.Instr) ([]byte, *BytecodeMetadata) {
 			binary.Write(buffer, binary.LittleEndian, stackTopDiff)
 			continue
 		case ops.BrTable:
-			branchTable := &BranchTable{
+			branchTable := &vnt.BranchTable{
 				// we subtract one for the implicit block created by
 				// the function body
-				blocksLen: len(blocks) - 1,
+				BlocksLen: len(blocks) - 1,
 			}
 			targetCount := instr.Immediates[0].(uint32)
-			branchTable.Targets = make([]Target, targetCount)
+			branchTable.Targets = make([]vnt.Target, targetCount)
 			for i := range branchTable.Targets {
 				// The first immediates is the number of targets, so we ignore that
 				label := int64(instr.Immediates[i+1].(uint32))
@@ -365,13 +285,10 @@ func Compile(disassembly []disasm.Instr) ([]byte, *BytecodeMetadata) {
 				block.branchTables = append(block.branchTables, branchTable)
 			}
 
-			emitMetadata(ops.BrTable, buffer.Len(), instAndInt64Len)
 			buffer.WriteByte(ops.BrTable)
 			binary.Write(buffer, binary.LittleEndian, int64(len(branchTables)-1))
-			continue
 		}
 
-		startIndex := buffer.Len()
 		buffer.WriteByte(instr.Op.Code)
 		for _, imm := range instr.Immediates {
 			err := binary.Write(buffer, binary.LittleEndian, imm)
@@ -379,7 +296,6 @@ func Compile(disassembly []disasm.Instr) ([]byte, *BytecodeMetadata) {
 				panic(err)
 			}
 		}
-		emitMetadata(instr.Op.Code, startIndex, buffer.Len()-startIndex)
 	}
 
 	// writing nop as the last instructions allows us to branch out of the
@@ -390,24 +306,17 @@ func Compile(disassembly []disasm.Instr) ([]byte, *BytecodeMetadata) {
 	// patch all references to the "root" block of the function body
 	for _, offset := range blocks[-1].patchOffsets {
 		code := buffer.Bytes()
-		buffer = patchOffset(code, offset, int64(addr), inboundTargets)
-		emitLabel(int(addr), ops.Block)
+		buffer = patchOffset(code, offset, int64(addr))
 	}
 
 	for _, table := range branchTables {
-		table.patchedAddrs = nil
+		table.PatchedAddrs = nil
 	}
-	return buffer.Bytes(), &BytecodeMetadata{
-		BranchTables:   branchTables,
-		Instructions:   metadata,
-		InboundTargets: inboundTargets,
-		LabelTables:    labelTables,
-	}
+	return buffer.Bytes(), branchTables
 }
 
 // replace the address starting at start with addr
-func patchOffset(code []byte, start int64, addr int64, inboundTargets map[int64]struct{}) *bytes.Buffer {
-	inboundTargets[addr] = struct{}{}
+func patchOffset(code []byte, start int64, addr int64) *bytes.Buffer {
 	var shift uint
 	for i := int64(0); i < 8; i++ {
 		code[start+i] = byte(addr >> shift)
@@ -417,32 +326,4 @@ func patchOffset(code []byte, start int64, addr int64, inboundTargets map[int64]
 	buf := new(bytes.Buffer)
 	buf.Write(code)
 	return buf
-}
-
-func (table *BranchTable) patchTable(block int, addr int64, inboundTargets map[int64]struct{}) {
-	inboundTargets[addr] = struct{}{}
-	if block < 0 {
-		panic("Invalid block value")
-	}
-
-	for i, target := range table.Targets {
-		if !table.isAddr(target.Addr) && target.Addr == int64(block) {
-			table.Targets[i].Addr = addr
-		}
-	}
-
-	if table.DefaultTarget.Addr == int64(block) {
-		table.DefaultTarget.Addr = addr
-	}
-	table.patchedAddrs = append(table.patchedAddrs, addr)
-}
-
-// Whether the given value is an instruction (or the block depth)
-func (table *BranchTable) isAddr(addr int64) bool {
-	for _, t := range table.patchedAddrs {
-		if t == addr {
-			return true
-		}
-	}
-	return false
 }
