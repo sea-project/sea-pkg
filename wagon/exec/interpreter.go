@@ -7,25 +7,25 @@ import (
 
 	"github.com/sea-project/sea-pkg/wagon/disasm"
 	"github.com/sea-project/sea-pkg/wagon/exec/internal/compile"
-	"github.com/sea-project/sea-pkg/wagon/vnt"
+	"github.com/sea-project/sea-pkg/wagon/sea"
 	"github.com/sea-project/sea-pkg/wagon/wasm"
 )
 
 type Interpreter struct {
 	*VM
-	Memory           *vnt.WavmMemory
+	Memory           *sea.WavmMemory
 	heapPointerIndex int64
 	Mutable          *bool
 }
 
-func NewInterpreter(module *wasm.Module, compiled []vnt.Compiled, initMem func(m *vnt.WavmMemory, module *wasm.Module) error, captureOp func(pc uint64, op byte) error, captureEnvFunctionStart func(pc uint64, name string) error, captureEnvFunctionEnd func(pc uint64, name string) error, debug bool) (*Interpreter, error) {
+func NewInterpreter(module *wasm.Module, compiled []sea.Compiled, initMem func(m *sea.WavmMemory, module *wasm.Module) error, captureOp func(pc uint64, op byte) error, captureEnvFunctionStart func(pc uint64, name string) error, captureEnvFunctionEnd func(pc uint64, name string) error, debug bool) (*Interpreter, error) {
 	var inter Interpreter
 	var vm VM
 	vm.captureOp = captureOp
 	vm.captureEnvFunctionStart = captureEnvFunctionStart
 	vm.captureEnvFunctionEnd = captureEnvFunctionEnd
 	vm.debug = debug
-	inter.Memory = vnt.NewWavmMemory()
+	inter.Memory = sea.NewWavmMemory()
 	inter.heapPointerIndex = -1
 	mut := false
 	inter.Mutable = &mut
@@ -227,12 +227,12 @@ func (vm *VM) ResetContext() {
 // things such as memory and control.
 type WavmProcess struct {
 	vm      *VM
-	memory  *vnt.WavmMemory
+	memory  *sea.WavmMemory
 	mutable *bool
 }
 
 // NewProcess creates a VM interface object for host functions
-func NewWavmProcess(vm *VM, memory *vnt.WavmMemory, mutable *bool) *WavmProcess {
+func NewWavmProcess(vm *VM, memory *sea.WavmMemory, mutable *bool) *WavmProcess {
 	return &WavmProcess{
 		vm,
 		memory,

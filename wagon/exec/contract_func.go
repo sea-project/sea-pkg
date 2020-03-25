@@ -9,14 +9,14 @@ import (
 	"reflect"
 	"runtime"
 
-	"github.com/sea-project/sea-pkg/wagon/vnt"
+	"github.com/sea-project/sea-pkg/wagon/sea"
 )
 
 type contractFunction struct {
 	val     reflect.Value
 	typ     reflect.Type
 	sig     int
-	memory  *vnt.WavmMemory
+	memory  *sea.WavmMemory
 	mutable *bool
 }
 

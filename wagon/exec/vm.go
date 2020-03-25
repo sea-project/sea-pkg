@@ -14,7 +14,7 @@ import (
 
 	"github.com/sea-project/sea-pkg/wagon/disasm"
 	"github.com/sea-project/sea-pkg/wagon/exec/internal/compile"
-	"github.com/sea-project/sea-pkg/wagon/vnt"
+	"github.com/sea-project/sea-pkg/wagon/sea"
 	"github.com/sea-project/sea-pkg/wagon/wasm"
 	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
 )
@@ -374,8 +374,7 @@ outer:
 				panic(fmt.Sprintf("exec: function at index %d is not a compiled function", vm.ctx.curFunc))
 			}
 			table := cf.branchTables[index]
-			// edited by vnt
-			var target vnt.Target
+			var target sea.Target
 			if label >= 0 && label < int32(len(table.Targets)) {
 				target = table.Targets[int32(label)]
 			} else {

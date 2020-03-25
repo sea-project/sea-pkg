@@ -9,7 +9,7 @@ import (
 	"math"
 	"reflect"
 
-	"github.com/sea-project/sea-pkg/wagon/vnt"
+	"github.com/sea-project/sea-pkg/wagon/sea"
 )
 
 type function interface {
@@ -18,7 +18,7 @@ type function interface {
 
 type compiledFunction struct {
 	code           []byte
-	branchTables   []*vnt.BranchTable // edited by vnt
+	branchTables   []*sea.BranchTable
 	maxDepth       int                // maximum stack depth reached while executing the function body
 	totalLocalVars int                // number of local variables used by the function
 	args           int                // number of arguments the function accepts

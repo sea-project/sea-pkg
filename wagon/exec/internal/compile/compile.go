@@ -44,7 +44,7 @@ import (
 
 	"github.com/sea-project/sea-pkg/wagon/disasm"
 	ops "github.com/sea-project/sea-pkg/wagon/wasm/operators"
-	"github.com/sea-project/sea-pkg/wagon/vnt"
+	"github.com/sea-project/sea-pkg/wagon/sea"
 )
 
 // A small note on the usage of discard instructions:
@@ -107,15 +107,15 @@ type block struct {
 	patchOffsets []int64 // A list of offsets in the bytecode stream that need to be patched with the correct jump addresses
 
 	discard      disasm.StackInfo // Information about the stack created in this block, used while creating Discard instructions
-	branchTables []*vnt.BranchTable   // All branch tables that were defined in this block.
+	branchTables []*sea.BranchTable   // All branch tables that were defined in this block.
 }
 
 // Compile rewrites WebAssembly bytecode from its disassembly.
 // TODO(vibhavp): Add options for optimizing code. Operators like i32.reinterpret/f32
 // are no-ops, and can be safely removed.
-func Compile(disassembly []disasm.Instr) ([]byte, []*vnt.BranchTable) {
+func Compile(disassembly []disasm.Instr) ([]byte, []*sea.BranchTable) {
 	buffer := new(bytes.Buffer)
-	branchTables := []*vnt.BranchTable{}
+	branchTables := []*sea.BranchTable{}
 
 	curBlockDepth := -1
 	blocks := make(map[int]*block) // maps nesting depths (labels) to blocks
@@ -257,13 +257,13 @@ func Compile(disassembly []disasm.Instr) ([]byte, []*vnt.BranchTable) {
 			binary.Write(buffer, binary.LittleEndian, stackTopDiff)
 			continue
 		case ops.BrTable:
-			branchTable := &vnt.BranchTable{
+			branchTable := &sea.BranchTable{
 				// we subtract one for the implicit block created by
 				// the function body
 				BlocksLen: len(blocks) - 1,
 			}
 			targetCount := instr.Immediates[0].(uint32)
-			branchTable.Targets = make([]vnt.Target, targetCount)
+			branchTable.Targets = make([]sea.Target, targetCount)
 			for i := range branchTable.Targets {
 				// The first immediates is the number of targets, so we ignore that
 				label := int64(instr.Immediates[i+1].(uint32))

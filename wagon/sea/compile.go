@@ -1,24 +1,5 @@
-// Copyright 2019 The go-vnt Authors
-// This file is part of go-vnt.
-//
-// go-vnt is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// go-vnt is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with go-vnt. If not, see <http://www.gnu.org/licenses/>.
+package sea
 
-package vnt
-
-// Target is the "target" of a br_table instruction.
-// Unlike other control instructions, br_table does jumps and discarding all
-// by itself.
 type Target struct {
 	Addr        int64 // The absolute address of the target
 	Discard     int64 // The number of elements to discard
