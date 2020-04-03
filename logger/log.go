@@ -474,6 +474,20 @@ func Trace(f interface{}, v ...interface{}) {
 //	}
 //	return fmt.Sprintf(msg, v...)
 //}
+func strSpecifiedLength(x interface{},c int) string {
+	strX := x.(string)
+	lenX := len(strX)
+	if lenX / c >= 0 && lenX / c < 1{
+		y := strings.Repeat(" ", c-lenX)
+		strX = strX+y
+		return strX
+	}
+	if lenX / c >= 1{
+		y := strings.Repeat(" ", int(lenX / c+1)*c -lenX)
+		strX = strX+y
+	}
+	return strX
+}
 
 func formatLog(f interface{}, v ...interface{}) string {
 	var msg string
@@ -487,7 +501,8 @@ func formatLog(f interface{}, v ...interface{}) string {
 		if strings.Contains(msg, "%") && !strings.Contains(msg, "%%") {
 			//format string
 		} else if len(v) == 1 {
-			return fmt.Sprintf("%v %v", f, v[0])
+			return fmt.Sprintf("%v%v", strSpecifiedLength(f,50), v[0])
+			//return fmt.Sprintf("%v %v", f, v[0])
 		} else {
 			str := ""
 			for key, val := range v {
@@ -501,14 +516,16 @@ func formatLog(f interface{}, v ...interface{}) string {
 					str += fmt.Sprintf("%v ", val)
 				}
 			}
-			msg = fmt.Sprintf("%v          %v", msg, strings.TrimSpace(str))
+			msg = fmt.Sprintf("%v%v",strSpecifiedLength(msg,50),strings.TrimSpace(str))
+			//msg = fmt.Sprintf("%v          %v", msg, strings.TrimSpace(str))
 		}
 	default:
 		msg = fmt.Sprint(f)
 		if len(v) == 0 {
 			return msg
 		} else if len(v) == 1 {
-			return fmt.Sprintf("%v %v", f, v[0])
+			return fmt.Sprintf("%v%v",strSpecifiedLength(f,50),v[0])
+			//return fmt.Sprintf("%v %v", f, v[0])
 		} else {
 			str := ""
 			for key, val := range v {
@@ -522,7 +539,8 @@ func formatLog(f interface{}, v ...interface{}) string {
 					str += fmt.Sprintf("%v ", val)
 				}
 			}
-			return fmt.Sprintf("%v          %v", msg, strings.TrimSpace(str))
+			return fmt.Sprintf("%v%v",strSpecifiedLength(msg,50),strings.TrimSpace(str))
+			//return fmt.Sprintf("%v          %v", msg, strings.TrimSpace(str))
 		}
 	}
 	return msg
