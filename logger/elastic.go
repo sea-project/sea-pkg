@@ -3,10 +3,10 @@ package logger
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"github.com/elastic/go-elasticsearch/v6"
-	"github.com/elastic/go-elasticsearch/v6/esapi"
 	"errors"
+	"fmt"
+	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"strconv"
 	"strings"
 	"sync"

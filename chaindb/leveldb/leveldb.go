@@ -7,6 +7,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/syndtr/goleveldb/leveldb/util"
 	"sync"
 )
 
@@ -68,7 +69,7 @@ func (db *LevelDB) Get(key []byte) ([]byte, error) {
 }
 
 // 数据库删除操作
-func (db *LevelDB) Del(key []byte) error {
+func (db *LevelDB) Delete(key []byte) error {
 	return db.db.Delete(key, nil)
 }
 
@@ -80,6 +81,13 @@ func (db *LevelDB) Has(key []byte) (bool, error) {
 // 数据库迭代器
 func (db *LevelDB) NewIterator() iterator.Iterator {
 	return db.db.NewIterator(nil, nil)
+}
+
+// NewIteratorWithStart creates a binary-alphabetical iterator over a subset of
+// database content starting at a particular initial key (or after, if it does
+// not exist).
+func (db *LevelDB) NewIteratorWithStart(start []byte) iterator.Iterator {
+	return db.db.NewIterator(&util.Range{Start: start}, nil)
 }
 
 // 返回数据库句柄
@@ -118,11 +126,53 @@ func (b *LdbBatch) Put(key, value []byte) error {
 }
 
 // 批量写入数据库
-func (b *LdbBatch) Save() error {
+func (b *LdbBatch) Write() error {
 	return b.db.Write(b.batch, nil)
 }
 
-// 获取暂存区数据大小
-func (b *LdbBatch) Size() int {
+// batch Delete
+func (b *LdbBatch) Delete(key []byte) error {
+	b.batch.Delete(key)
+	b.size++
+	return nil
+}
+
+// batch ValueSize
+func (b *LdbBatch) ValueSize() int {
 	return b.size
+}
+
+// batch Reset
+func (b *LdbBatch) Reset() {
+	b.batch.Reset()
+	b.size = 0
+}
+
+// batch Replay
+func (b *LdbBatch) Replay(w types.Putter) error {
+	return b.batch.Replay(&replayer{writer: w})
+}
+
+// replayer
+type replayer struct {
+	writer  types.Putter
+	failure error
+}
+
+// replayer Put
+func (r *replayer) Put(key, value []byte) {
+	// If the replay already failed, stop executing ops
+	if r.failure != nil {
+		return
+	}
+	r.failure = r.writer.Put(key, value)
+}
+
+// replayer Delete
+func (r *replayer) Delete(key []byte) {
+	// If the replay already failed, stop executing ops
+	if r.failure != nil {
+		return
+	}
+	r.failure = r.writer.Delete(key)
 }

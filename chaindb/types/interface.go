@@ -1,8 +1,13 @@
 package types
 
+import "github.com/syndtr/goleveldb/leveldb/iterator"
+
+const IdealBatchSize = 100 * 1024
+
 // 定义写操作接口
 type Putter interface {
 	Put(key []byte, value []byte) error
+	Delete(key []byte) error
 }
 
 // 定义数据库操作接口
@@ -11,13 +16,17 @@ type Database interface {
 	Path() string
 	Get(key []byte) ([]byte, error)
 	Has(key []byte) (bool, error)
-	Del(key []byte) error
 	Close() error
+	NewBatch() Batch
+	NewIterator() iterator.Iterator
+	NewIteratorWithStart(start []byte) iterator.Iterator
 }
 
 // 批量操作接口
 type Batch interface {
 	Putter
-	Save() error
-	Size() int
+	Write() error
+	ValueSize() int
+	Reset()
+	Replay(w Putter) error
 }
