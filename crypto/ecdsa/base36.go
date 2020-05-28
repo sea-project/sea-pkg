@@ -2,7 +2,6 @@ package ecdsa
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -20,6 +19,8 @@ var (
 )
 
 var (
+	pn    = 3 // prefix len
+	on    = 4 // orgcode len
 	Big1  = big.NewInt(1)
 	Big0  = big.NewInt(0)
 	Big36 = big.NewInt(36)
@@ -45,26 +46,20 @@ func base36Encode(i *big.Int) string {
 	return string(chars)
 }
 
-func parseICAP(s, prefix, orgcode string) (Address, error) {
-	if !strings.HasPrefix(s, prefix) {
-		return Address{}, errICAPCountryCode
-	}
-	if err := validCustomCheckSum(s, prefix, orgcode); err != nil {
+func parseICAP(s string) (Address, error) {
+	if err := validCustomCheckSum(s); err != nil {
 		return Address{}, err
 	}
 	// checksum is ISO13616, Ethereum address is base-36
-	bigAddr, _ := new(big.Int).SetString(s[len(prefix)+2+len(orgcode):], 36)
+	bigAddr, _ := new(big.Int).SetString(s[pn+2+on:], 36)
 	return BigToAddress(bigAddr), nil
 }
 
 // validCheckSum
-func validCustomCheckSum(s, prefix, orgcode string) error {
-	pn := len(prefix)
-	on := len(orgcode)
+func validCustomCheckSum(s string) error {
+
+	// base-36 + prefix + orgcode + checkSumNum
 	s = join(s[pn+2+on:], s[:pn], s[pn+2:pn+2+on], s[pn:pn+2])
-
-	fmt.Println("s==>", s)
-
 	expanded, err := iso13616Expand(s)
 	if err != nil {
 		return err

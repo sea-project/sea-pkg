@@ -33,10 +33,10 @@ func BigToAddress(b *big.Int) Address { return BytesToAddress(b.Bytes()) }
 func HexToAddress(s string) Address { return BytesToAddress(conv.FromHex(s)) }
 
 // ConvertICAPToAddress icpa转换成42位地址格式
-func ConvertICAPToAddress(icpa, prefix, orgcode string) (Address, error) {
+func ConvertICAPToAddress(icpa string) (Address, error) {
 	switch len(icpa) {
 	case 40: // "SEA" + 2 digit checksum + 4 organization code + 31 base-36 chars of address
-		return parseICAP(icpa, prefix, orgcode)
+		return parseICAP(icpa)
 	default:
 		return Address{}, errICAPLength
 	}
