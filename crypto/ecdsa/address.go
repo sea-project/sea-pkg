@@ -124,5 +124,5 @@ func (a Address) ToICAP(prefix, orgcode string) string {
 		enc = join(strings.Repeat("0", 31-len(enc)), enc)
 	}
 	icap := join(prefix, checkDigits(enc, prefix, orgcode), orgcode, enc)
-	return icap
+	return strings.ToLower(icap)
 }
