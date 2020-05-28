@@ -32,6 +32,16 @@ func BigToAddress(b *big.Int) Address { return BytesToAddress(b.Bytes()) }
 // HexToAddress 十六进制字符串转地址
 func HexToAddress(s string) Address { return BytesToAddress(conv.FromHex(s)) }
 
+// ConvertICAPToAddress icpa转换成42位地址格式
+func ConvertICAPToAddress(icpa, prefix, orgcode string) (Address, error) {
+	switch len(icpa) {
+	case 40: // "SEA" + 2 digit checksum + 4 organization code + 31 base-36 chars of address
+		return parseICAP(icpa, prefix, orgcode)
+	default:
+		return Address{}, errICAPLength
+	}
+}
+
 // IsHexAddress 验证字符串是否可以表示有效的十六进制编码的地址
 func IsHexAddress(s string) bool {
 	if conv.HasHexPrefix(s) {
@@ -68,7 +78,7 @@ func (a Address) Hex() string {
 			result[i] -= 32
 		}
 	}
-	return "0x" + string(result)
+	return "0x" + strings.ToLower(string(result))
 }
 
 // String 实现了fmt.Stringer字符串
@@ -105,4 +115,14 @@ func (a *Address) Scan(src interface{}) error {
 // Value 实现了数据库/sql的valuer
 func (a Address) Value() (driver.Value, error) {
 	return a[:], nil
+}
+
+// ToICAP 转换成ICAP格式地址
+func (a Address) ToICAP(prefix, orgcode string) string {
+	enc := base36Encode(a.Big())
+	if len(enc) < 31 {
+		enc = join(strings.Repeat("0", 31-len(enc)), enc)
+	}
+	icap := join(prefix, checkDigits(enc, prefix, orgcode), orgcode, enc)
+	return icap
 }
