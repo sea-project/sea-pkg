@@ -47,6 +47,7 @@ func base36Encode(i *big.Int) string {
 }
 
 func parseICAP(s string) (Address, error) {
+	s = strings.ToUpper(s)
 	if err := validCustomCheckSum(s); err != nil {
 		return Address{}, err
 	}
@@ -72,6 +73,7 @@ func validCustomCheckSum(s string) error {
 }
 
 func checkDigits(s, prefix, orgcode string) string {
+	prefix = strings.ToUpper(prefix)
 	expanded, _ := iso13616Expand(strings.Join([]string{s, prefix + orgcode + "00"}, ""))
 	num, _ := new(big.Int).SetString(expanded, 10)
 	num.Sub(Big98, num.Mod(num, Big97))
