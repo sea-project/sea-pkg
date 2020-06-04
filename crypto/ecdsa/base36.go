@@ -74,7 +74,8 @@ func validCustomCheckSum(s string) error {
 
 func checkDigits(s, prefix, orgcode string) string {
 	prefix = strings.ToUpper(prefix)
-	expanded, _ := iso13616Expand(strings.Join([]string{s, prefix + orgcode + "00"}, ""))
+	orgcode = strings.ToUpper(orgcode)
+	expanded, _ := iso13616Expand(strings.Join([]string{s, prefix, orgcode, "00"}, ""))
 	num, _ := new(big.Int).SetString(expanded, 10)
 	num.Sub(Big98, num.Mod(num, Big97))
 
