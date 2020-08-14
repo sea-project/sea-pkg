@@ -37,6 +37,10 @@ func AesEncrypt(origData, key []byte) ([]byte, error) {
 		}
 	}()
 
+	if len(key) == 0 {
+		return nil, errors.New("The password cannot be empty")
+	}
+
 	key16 := make([]byte, 16)
 	copy(key16, key)
 

@@ -44,7 +44,7 @@ func Test_Del(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	err = ldb.Del([]byte("qiqi"))
+	err = ldb.Delete([]byte("qiqi"))
 	t.Log(err)
 }
 
@@ -63,9 +63,9 @@ func TestLdbBatch_Put(t *testing.T) {
 	batch.Put([]byte("333333"), []byte("333333"))
 	batch.Put([]byte("444444"), []byte("444444"))
 	batch.Put([]byte("555555"), []byte("555555"))
-	batch.Save()
+	batch.Write()
 
-	t.Logf("填充数量s：%d", batch.Size())
+	t.Logf("填充数量s：%d", batch.ValueSize())
 
 	value, err := ldb.Get([]byte("222222"))
 	if err != nil {
@@ -88,11 +88,11 @@ func BenchmarkLdbBatch_Put(b *testing.B) {
 
 	batch := ldb.NewBatch()
 
-	ldb.Del([]byte("555555"))
+	ldb.Delete([]byte("555555"))
 
 	for i := 0; i < b.N; i++ {
 		batch.Put([]byte("555555"), []byte("555555"))
 	}
-	batch.Save()
-	ldb.Del([]byte("555555"))
+	batch.Write()
+	ldb.Delete([]byte("555555"))
 }
