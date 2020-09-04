@@ -1,4 +1,4 @@
-package http_client
+package httppool
 
 import (
 	"fmt"
@@ -6,6 +6,14 @@ import (
 	"testing"
 	"time"
 )
+
+func Test_HP_Single(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		hp := NewHttpPool(0, 0, 3)
+		fmt.Println(&hp)
+	}
+
+}
 
 func Test_HP_Get(t *testing.T) {
 	hp := NewHttpPool(0, 0, 3)
