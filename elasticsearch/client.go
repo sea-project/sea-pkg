@@ -1,11 +1,8 @@
 package elasticsearch
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strings"
 )
 
@@ -99,43 +96,11 @@ func (c *Client) AddRecord(indexName string, requestBody string) error {
 	if len(requestBody) == 0 {
 		return fmt.Errorf("parameter requestBody error")
 	}
-
-	// 构建请求
-	httpClient := &http.Client{
-		Timeout: ConnTimeOut,
-	}
-	req, err := http.NewRequest("POST", c.addr+indexName+"/_doc", bytes.NewBuffer([]byte(requestBody)))
+	result := new(ResponseAddRecord)
+	err := HTTPRequest("POST", c.addr+indexName+"/_doc", requestBody, 201, result)
 	if err != nil {
 		return fmt.Errorf("http.NewRequest err:%v", err.Error())
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	// 执行请求
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("httpClient.Do err:%v", err.Error())
-	}
-	defer res.Body.Close()
-
-	// 获取请求返回数据
-	var bodyBytes []byte
-	bodyBytes, err = ioutil.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("ioutil.ReadAll err:%v", err.Error())
-	}
-	// 判断是否返回错误，因为该接口正确返回的时候状态码是201，不是200，和其它接口不一样
-	errResult := new(ResponseError)
-	json.Unmarshal(bodyBytes, errResult)
-	if len(errResult.Error.Type) != 0 {
-		return fmt.Errorf("request err status:%v, type:%v, reason:%v", errResult.Status, errResult.Error.Type, errResult.Error.Reason)
-	}
-
-	result := new(ResponseAddRecord)
-	json.Unmarshal(bodyBytes, result)
-	if len(result.ID) == 0 {
-		return fmt.Errorf("request return data error")
-	}
-
 	return nil
 }
 
@@ -252,34 +217,10 @@ func (c *Client) DeleteRecord(indexName string, id string) error {
 		return fmt.Errorf("parameter id error")
 	}
 
-	// 构建请求
-	httpClient := &http.Client{
-		Timeout: ConnTimeOut,
-	}
-	req, err := http.NewRequest("DELETE", c.addr+indexName+"/_doc/"+id, nil)
+	result := new(ResponseDeleteRecord)
+	err := HTTPRequest("DELETE", c.addr+indexName+"/_doc/"+id, "", OKCode, result)
 	if err != nil {
 		return fmt.Errorf("http.NewRequest err:%v", err.Error())
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	// 执行请求
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("httpClient.Do err:%v", err.Error())
-	}
-	defer res.Body.Close()
-
-	// 处理返回结果
-	var bodyBytes []byte
-	bodyBytes, err = ioutil.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("ioutil.ReadAll err:%v", err.Error())
-	}
-
-	result := new(ResponseDeleteRecord)
-	err = json.Unmarshal(bodyBytes, result)
-	if err != nil {
-		return fmt.Errorf("request return data err:%v", string(bodyBytes))
 	}
 
 	// 删除成功的标志是该字段为deleted
